@@ -5,6 +5,7 @@ import datetime
 from dataclasses import dataclass
 from datetime import datetime,timedelta
 import pandas as pd
+import numpy as np
 from .io import *
 
 x_pi = 3.14159265358979324 * 3000.0 / 180.0
@@ -20,6 +21,42 @@ VEHICLE_TYPE = "C385"
 class Period:
     start_time:str
     end_time:str
+
+    def is_overlapping(self, other_period):
+        """
+        判断当前Period对象与另一个Period对象是否存在时间重叠。
+
+        参数:
+        other_period (Period): 另一个Period对象。
+
+        返回:
+        bool: 如果两个Period对象存在时间重叠，则返回True，否则返回False。
+        """
+        def parse_time(time_str):
+            """
+            将字符串形式的时间转换为datetime对象。
+
+            参数:
+            time_str (str): 要转换的时间字符串。
+
+            返回:
+            datetime: 转换后的datetime对象。
+            """
+            return datetime.strptime(time_str,'%Y-%m-%d %H:%M:%S.%f')
+
+        start1 = parse_time(self.start_time)
+        end1 = parse_time(self.end_time)
+        start2 = parse_time(other_period.start_time)
+        end2 = parse_time(other_period.end_time)
+
+        # start1 = self.start_time
+        # end1 = self.end_time
+        # start2 = other_period.start_time
+        # end2 = other_period.end_time
+        # 该条件表示如果 period1 的开始时间早于 period2 的结束时间
+        # 且 period2 的开始时间早于 period1 的结束时间
+        # 则两个时间段存在重叠
+        return start1 <= end2 and start2 <= end1
 
 class CoordProcessor:
     @staticmethod
@@ -131,10 +168,13 @@ class TimeStampProcessor:
         
     @staticmethod
     def trans_timestamp_to_general_format(temporal_timestamp):
-        if len(temporal_timestamp) == 16:
-            temporal_timestamp = int(int(temporal_timestamp)/1000000)
-        data_obj = datetime.fromtimestamp(temporal_timestamp)
-        return data_obj.strftime("%Y-%m-%d %H:%M:%S")
+        if type(temporal_timestamp) == float:
+            data_obj = datetime.fromtimestamp(temporal_timestamp)
+            return data_obj.strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            if len(temporal_timestamp) == 16:
+                data_obj = datetime.fromtimestamp(float(temporal_timestamp)/10**6)
+                return data_obj.strftime("%Y-%m-%d %H:%M:%S.%f")
     
     @staticmethod
     def calculate_time_interval(period):
@@ -205,20 +245,57 @@ class DataSearcher:
         return found_files
 
     @staticmethod
-    def get_raw_data_package(directory_path,input_timestamp):
+    def get_raw_data_package(directory_path,start_timestamp,end_timestamp):
         def __convert_timestamp_format(input_timestamp):
             # Parse the input timestamp string into a datetime object
-            dt = datetime.strptime(input_timestamp, '%Y-%m-%d %H:%M:%S')
+            dt = datetime.strptime(input_timestamp, '%Y-%m-%d %H:%M:%S.%f')
             
             # Format the datetime object into the desired output format
             output_timestamp = dt.strftime('%Y-%m-%d_%H-%M-%S')
             
             return output_timestamp
-
-        def __find_matching_data_package(directory, target_timestamp):
-            # Convert the target timestamp to a datetime object
-            target_datetime = datetime.strptime(target_timestamp, '%Y-%m-%d_%H-%M-%S')
             
+        def __get_utc_range(file_path):
+            """
+            读取CSV文件并提取'utc'列的最大值和最小值。
+
+            参数:
+            file_path (str): CSV文件的路径。
+
+            返回:
+            dict: 包含'utc'列最大值和最小值的字典。
+            """
+            try:
+                # 读取CSV文件到DataFrame
+                df = pd.read_csv(file_path)
+
+                # 提取'utc'列
+                utc_column = df['utc']
+
+                # 获取最大值和最小值
+                max_utc = utc_column.max()
+                min_utc = utc_column.min()
+
+                # 返回结果
+                return {'max_utc': max_utc, 'min_utc': min_utc}
+
+            except FileNotFoundError:
+                print(f"文件未找到: {file_path}")
+                return None
+            except KeyError:
+                print(f"文件中没有'utc'列: {file_path}")
+                return None
+            except Exception as e:
+                print(f"读取文件时出错: {e}")
+                return None
+            
+        def __find_matching_data_package(directory, start_timestamp,end_timestamp):
+            # Convert the target timestamp to a datetime object
+            start_datetime = datetime.strptime(start_timestamp, '%Y-%m-%d %H:%M:%S.%f')
+            end_datetime = datetime.strptime(end_timestamp, '%Y-%m-%d %H:%M:%S.%f')
+            
+            period_vec = Period(start_timestamp, end_timestamp)
+
             matching_files = []
             
             # Walk through the directory and all its subdirectories
@@ -226,16 +303,31 @@ class DataSearcher:
                 for filename in files:
                     # Check if the filename matches the expected format
                     if len(filename.split('_')) == 4:
-                        # Extract the timestamp part of the filename
-                        file_timestamp = filename.split('_')[2] + "_" + filename.split('_')[3].split('.')[0]
-                        
+                        # 根据定位文件的文件名获取对应时间
+                        _raw_file_timestamp = filename.split('_')[2] + "_" + filename.split('_')[3].split('.')[0]
+                        _raw_file_datetime = datetime.strptime(_raw_file_timestamp, '%Y-%m-%d_%H-%M-%S')
+
                         try:
-                            # Convert the extracted timestamp to a datetime object
-                            file_datetime = datetime.strptime(file_timestamp, '%Y-%m-%d_%H-%M-%S')
-                            # file_datetime_last = file_datetime + timedelta(seconds=TIME_SPAN_PER_DATA_PACKAGE)
-                            # Compare the file timestamp with the target timestamp
-                            if file_datetime < target_datetime and target_datetime < file_datetime + timedelta(seconds=TIME_SPAN_PER_DATA_PACKAGE):
-                                matching_files.append(os.path.join(root, filename))
+                            if _raw_file_datetime < start_datetime \
+                                and end_datetime < _raw_file_datetime + timedelta(seconds=TIME_SPAN_PER_DATA_PACKAGE):
+                                # 初步筛选，判断文件时间是否在目标时间范围内 
+                                # Convert the extracted timestamp to a datetime object
+                                # start_timestamp = datetime.strptime(start_timestamp, '%Y-%m-%d %H:%M:%S.%f') 
+                                # Extract the file path
+                                filepath = os.path.join(root,filename)
+                                file_time_span = __get_utc_range(filepath)
+
+                                file_start_timestamp = TimeStampProcessor.trans_timestamp_to_general_format(float(file_time_span['min_utc']))
+                                file_end_timestamp = TimeStampProcessor.trans_timestamp_to_general_format(float(file_time_span['max_utc']))
+                                
+                                temp_loc_period = Period(file_start_timestamp, file_end_timestamp)  
+
+                                if period_vec.is_overlapping(temp_loc_period):
+                                    matching_files.append(os.path.join(root, filename))
+                                # if _raw_file_datetime < start_timestamp \
+                                #     and end_timestamp < _raw_file_datetime + timedelta(seconds=TIME_SPAN_PER_DATA_PACKAGE):
+                                #     pass
+                                # matching_files.append(os.path.join(root, filename))
                         except ValueError:
                             # Skip files with incorrect timestamp format
                             continue
@@ -246,10 +338,14 @@ class DataSearcher:
                 data_package_name_list.append(data_package_name)
 
             return matching_files,data_package_name_list
-        target_timestamp = __convert_timestamp_format(input_timestamp)
-        matching_files = __find_matching_data_package(directory_path, target_timestamp)
-        if matching_files:
-            return matching_files
+        
+        #读取矢量化要素的时间戳
+        # _gf_start_timestamp = __convert_timestamp_format(start_timestamp)
+        # _gf_end_timestamp = __convert_timestamp_format(end_timestamp)
+        # matching_files = __find_matching_data_package(directory_path, _gf_start_timestamp,_gf_end_timestamp)
+        matching_files,data_package_name_list = __find_matching_data_package(directory_path, start_timestamp,end_timestamp)
+        if len(matching_files)!=0:
+            return matching_files,data_package_name_list
         else:
             print("No matching files found.")
 
@@ -266,17 +362,108 @@ class DataSamplePathWrapper:
         self.vec_data = input.read_sample_geojson_file(self.vec_path)
         self.traj_data = input.read_sample_geojson_file(self.traj_path)
         self.loc_data = self.__match_vec_to_loc()
-        self.vis_data = self.__match_vec_to_vis()
-        # self.vec_path = os.path.join(self.data_package_path,os.path.split(self.vec_path)[1])
-        # self.traj_path = os.path.join(self.data_package_path,os.path.split(self.traj_path)[1])
+        self.loc_2_vis,self.vis_data = self.__match_vec_to_vis_TR()
+
     def write_sample_to_target_folder(self,target_folder="."):
         # 写入文件到目标文件夹
         output.write_to_foler(
                             self.vec_path,
                             self.traj_path,
                             self.loc_data,
+                            self.loc_2_vis,
                             self.vis_data
                         )
+    
+    def __match_vec_to_vis_TR(self):
+        _all_pic = []
+        for i in range(len(self.vis_path)):
+            all_pic_files = os.listdir(self.vis_path[i])
+            _all_pic = _all_pic + all_pic_files
+
+        def re_organize_timestamp(df,target_timestamp_column_name):
+            if 'timestamp' in df.columns:
+                _base_time = df[target_timestamp_column_name].min()
+                df['cam_pkg_time'] = df[target_timestamp_column_name] - _base_time
+            elif 'utc' in df.columns:
+                _base_time = df[target_timestamp_column_name].min()
+                df['loc_pkg_time'] = df[target_timestamp_column_name] - _base_time
+            return df
+            
+        def parse_pic_list(pic_list):
+            data = []
+            for pic in pic_list:
+                match = re.match(r'(\d+\.\d+)_\d+_(\d)\.jpg', pic)
+                if match:
+                    timestamp = float(match.group(1))
+                    camera = int(match.group(2))
+                    data.append((timestamp, camera, pic))
+            return pd.DataFrame(data, columns=['timestamp', 'camera', 'pic'])
+        
+        def find_matching_pics(loc, cam):
+            merge_df = pd.merge_asof(loc.sort_values('utc'),
+                          cam[['cam_pkg_time','timestamp','camera', 'pic']].sort_values('timestamp'),
+                          left_on = 'loc_pkg_time',
+                          right_on = 'cam_pkg_time',
+                          tolerance= 0.09,
+                          direction='nearest')
+            
+            # 修改列名
+            if cam.camera.iloc[0] == 0:
+                merge_df.rename(columns={'camera': 'camera_0','pic': 'pic_0'}, inplace=True)
+            elif cam.camera.iloc[0] == 1:
+                merge_df.rename(columns={'camera': 'camera_1','pic': 'pic_1'}, inplace=True)
+            # import matplotlib.pyplot as plt
+            # df = pd.DataFrame(columns=['value'])
+            # df['value'] = merge_df['loc_pkg_time']-merge_df['cam_pkg_time']
+            # plt.figure(figsize=(10, 6))
+            # plt.plot(df.index, df['value'], marker='o', linestyle='-', color='b')
+            # plt.title('Line Plot of Single Column DataFrame with Date Index')
+            # plt.xlabel('Date')
+            # plt.ylabel('Value')
+            # plt.grid(True)
+            # plt.show()
+
+            return merge_df
+        
+        pic_df = parse_pic_list(_all_pic)
+        pic_df = re_organize_timestamp(pic_df,'timestamp')
+
+        ro_cam0 = pic_df[pic_df['camera']==0]
+        ro_cam1 = pic_df[pic_df['camera']==1] 
+
+        target_df_loc = input.read_sample_location_file(self.loc_path) #这里需要整体的C385数据包解出的定位数据
+        target_df_loc = TimeStampProcessor.get_extra_suffix_dataframe(target_df_loc)
+        ro_loc = re_organize_timestamp(target_df_loc,'utc')
+        
+        # result_df = find_matching_pics(target_df_loc, pic_df)
+        mathced_result = find_matching_pics(ro_loc, ro_cam0)
+        mathced_result = find_matching_pics(mathced_result, ro_cam1)
+        # print(self.loc_data)
+        
+        def find_closest_utc(df, utc_value):
+            diff = np.abs(df['utc'] - utc_value)
+            idx = diff.idxmin()
+            return df.loc[idx]
+
+        # 使用函数查找loc_data中每个utc最近的matched_result中的行
+        closest_rows = self.loc_data['utc'].apply(lambda x: find_closest_utc(mathced_result, x))
+
+        # 将找到的行拼接到loc_data中
+        mathced_result = pd.concat([self.loc_data.reset_index(drop=True), closest_rows.reset_index(drop=True)], axis=1)
+        
+        def is_valid_image_string(img):
+            # 检查 img 是否是字符串，并且以 '_0.jpg' 或 '_1.jpg' 结尾
+            return isinstance(img, str) and (img.endswith('_0.jpg') or img.endswith('_1.jpg'))
+        # camera_0_images = [img for img in mathced_result['pic_0'].tolist() if img.endswith('_0.jpg')]
+        # camera_1_images = [img for img in mathced_result['pic_1'].tolist() if img.endswith('_1.jpg')]
+        camera_0_images = [img for img in mathced_result['pic_0'] if is_valid_image_string(img)]
+        camera_1_images = [img for img in mathced_result['pic_1'] if is_valid_image_string(img)]
+        
+        camera_0_images = [os.path.join(self.vis_path[0],item) for item in camera_0_images]
+        camera_1_images = [os.path.join(self.vis_path[0],item) for item in camera_1_images]
+        
+        return mathced_result,{'cam_0':camera_0_images,'cam_1':camera_1_images}
+
     def __match_vec_to_vis(self):
         _all_pic = []
         for i in range(len(self.vis_path)):
@@ -345,24 +532,7 @@ class DataSamplePathWrapper:
                 new_lng, new_lat = CoordProcessor.gcj02towgs84_point_level(row['longitude'], row['latitude'])
                 return pd.Series([new_lng, new_lat], index=['new_longitude', 'new_latitude'])
             filtered_points[['new_longitude', 'new_latitude']] = filtered_points.apply(convert_row, axis=1)
-            # filtered_points = TimeStampProcessor.get_extra_suffix_dataframe(filtered_points)
             return filtered_points
-            '''
-            uniq_time_stamp = []
-            if filtered_points.empty==True:
-                #未筛选到符合时间要求的轨迹点
-                continue
-            else:
-                if start_time not in uniq_time_stamp:
-                    uniq_time_stamp.append(start_time)
-                print(filtered_points.shape[0])
-                _pe = geo_obj['positional_error']
-                label = get_label_from_positional_error(_pe)
-                _pt = filtered_points['position_type'].mode()
-                cluster_pt = get_cluster_from_position_type(_pt[0])
-
-                result_df = result_df.append(pd.Series({'clus':cluster_pt,'label':label}), ignore_index=True)
-            '''
         pass
 class VehicleDataset:
     # 配置矢量数据与轨迹数据的根目录

@@ -43,8 +43,10 @@ class PositionErrorPredictPipeline():
         # 创建VehicleDataset对象
         _current_vehicle_dataset = VehicleDataset(full_vec_path_list, full_traj_path_list)
 
-        tiff = TimeStampProcessor.trans_timestamp_to_general_format(end_time)
-        target_loc_data_package,package_names = DataSearcher.get_raw_data_package(self.location_file_path, tiff)
+        _gf_start_time = TimeStampProcessor.trans_timestamp_to_general_format(start_time)
+        _gf_end_time = TimeStampProcessor.trans_timestamp_to_general_format(end_time)
+
+        target_loc_data_package,package_names = DataSearcher.get_raw_data_package(self.location_file_path,_gf_start_time,_gf_end_time)
 
         for package_name in package_names:
             target_vis_data_package = DataSearcher.get_target_shape_data_path(self.vision_file_path, package_name)
