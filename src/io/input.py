@@ -44,3 +44,9 @@ def read_sample_location_file(location_paths):
         merged_df = pd.concat([merged_df, df], ignore_index=True)
         
     return merged_df
+
+def raed_feather(feather_path):
+    #此函数用用户读取相机的内部参数与外部参数
+    with open(feather_path,"rb") as fp:
+        _content = fp.read()
+    return _content
