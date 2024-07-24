@@ -8,8 +8,8 @@
             "name": "torch",
             "type": "debugpy",
             "request": "launch",
-            // "program": "main.py", //"${file}",
-            "program": "${file}",
+            "program": "main.py", //"${file}",
+            // "program": "${file}",
             "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
             "console": "integratedTerminal"
         }
