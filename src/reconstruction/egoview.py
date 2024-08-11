@@ -1,11 +1,14 @@
-import os
 import cv2
 import numpy as np
 
 from src.reconstruction.vanishing_point_utils import get_vanishing_point
+from .transformation_utils import *
 from .TransformGround2Image import TransformGround2Image
 from .TransformImage2Ground import TransformImage2Ground
 from math import pi
+
+np.set_printoptions(precision=6, suppress=True)
+
 class Info(object):
     def __init__(self, dct):
         self.dct = dct
@@ -32,13 +35,13 @@ class EgoviewReconstruction:
         self.K_cam0 = np.array([[1907.819946, 0, 1903.890015],
                                 [0, 1907.670044, 1065.380005],
                                 [0, 0, 1]])
-        
+        # self.R = 
         self.cameraInfo = Info({
             "focalLengthX": int(1907.819946),   # focal length x
             "focalLengthY": int(1907.670044),   # focal length y
             "opticalCenterX": int(1903.890015), # optical center x
             "opticalCenterY": int(1065.380005), # optical center y
-            "cameraHeight": 640,    # camera height in `mm`
+            "cameraHeight": 1340,    # camera height in `mm`
             "pitch": -0.030369*(180/pi),    # rotation degree around x
             "yaw": 0.028274*(180/pi),   # rotation degree around y
             "roll": -0.006632*(180/pi),  # rotation degree around z
@@ -53,17 +56,16 @@ class EgoviewReconstruction:
             "tx":1.77,
             "ty":0.07,
             "tz":1.34,
+            # "rx":-0.03037,
+            # "ry":0.028274,
+            # "rz":-0.006632
+            # "rx":-0.03037-pi/2,
+            # "ry":0.028274,
+            # "rz":-0.006632-pi/2
             "rx":-0.03037,
-            "ry":0.028274,
-            "rz":-0.006632
+            "ry":0.028274+pi/2,
+            "rz":-0.006632-pi/2
         })
-
-        # tx = 1.77
-        # ty = 0.07
-        # tz = 1.34
-        # rx = -0.03037
-        # ry = 0.028274
-        # rz = -0.006632
 
         self.six_dof_data = np.array([self.cameraInfo.tx, 
                                  self.cameraInfo.ty, 
@@ -71,17 +73,59 @@ class EgoviewReconstruction:
                                  self.cameraInfo.rx, 
                                  self.cameraInfo.ry, 
                                  self.cameraInfo.rz])
-        self.extrinsic_matrix = self.from_6DoF_to_Rvec(self.six_dof_data)
+        
+        rot_mat_ca,trans_vec_ca = self.get_camera_pose()
+        self.extrinsic_matrix = camera_pose_to_extrinsic(rot_mat_ca,trans_vec_ca)
+        self.extrinsic_rotation_matrix = self.extrinsic_matrix[:3,:3]
+        self.extrinsic_transaction_vector = self.extrinsic_matrix[:3,3]
+        # self.extrinsic_rotation_matrix = 
+        # self.R_vec,self.T_vec,self.extrinsic_matrix = self.from_6DoF_to_Rvec(self.six_dof_data)
+    def get_camera_pose(self):
+        # rot_ca = sciR.from_euler('zyx',[
+        #                         self.cameraInfo["rz"],\
+        #                         self.cameraInfo["ry"],\
+        #                         self.cameraInfo["rx"]
+        #                         ])
+        # trans_ca = [
+        #     self.cameraInfo["tx"],
+        #     self.cameraInfo["ty"],
+        #     self.cameraInfo["tz"]
+        # ]
+        rot_ca = sciR.from_euler('zyx',[
+                                self.cameraInfo.rz,\
+                                self.cameraInfo.ry,\
+                                self.cameraInfo.rx
+                                ])
+        trans_ca = [
+            self.cameraInfo.tx,
+            self.cameraInfo.ty,
+            self.cameraInfo.tz
+        ]
+        trans_vec_ca = np.array(trans_ca)
+        rot_mat_ca = rot_ca.as_matrix()
+        self.pose_rotation_matrix = rot_mat_ca
+        self.pose_transaction_vector = trans_vec_ca
+        pose_matrix = np.hstack((rot_mat_ca, trans_vec_ca.reshape(3, 1)))
+        return rot_mat_ca,trans_vec_ca
+    
     def from_6DoF_to_Rvec(self, six_dof_data):
         R_vec = np.array(six_dof_data[3:])
         T_vec = np.array(six_dof_data[:3])
+
+        # Converts a rotation matrix to a rotation vector or vice versa.
+        print(R_vec)
         R_matrix, _ = cv2.Rodrigues(R_vec)
-        print("旋转矩阵：")
+        print("相机坐标系相对于世界坐标系的旋转矩阵：")
         print(R_matrix)
-        extrinsic_matrix = np.hstack((R_matrix, T_vec.reshape(3, 1)))
-        print("外参矩阵：")
-        print(extrinsic_matrix)
-        return extrinsic_matrix
+        pose_matrix = np.hstack((R_matrix, T_vec.reshape(3, 1)))
+        print("相机位姿矩阵：")
+        print(pose_matrix)
+
+        # 由计算外参矩阵
+        # extrinsic_matrix = pose_to_extrinsic(pose_matrix)
+        extrinsic_matrix_rt = camera_pose_to_extrinsic(R_matrix,T_vec)
+        print(f"自车坐标系原点在相机坐标系的x，y，z向量坐标：\n{extrinsic_matrix_rt @ (np.array([[0,0,0,1]]).T)}")
+        return R_matrix,T_vec,extrinsic_matrix_rt#pose_matrix
 
     def get_undistort_img(self, temp='ca_cam0_sample'):
         image = cv2.imread(f"{temp}.jpg")
@@ -106,12 +150,134 @@ class EgoviewReconstruction:
         cv2.imwrite(temp+'_undist.jpg', undistorted_img)
 
         return undistorted_img
+
+    @staticmethod
+    def pixel_to_world(u, v, K, dist_coeffs, R, T, vehicle_height):
+        # 步骤1：使用内参矩阵和畸变系数对像素坐标进行去畸变，得到校正后的像素坐标。
+        undistorted_points = cv2.undistortPoints(np.array([[[u, v]]], dtype=np.float32), K, dist_coeffs)
+
+        # 步骤2：将校正后的像素坐标转换为归一化相机坐标。
+        # 归一化坐标即是从像素坐标除以焦距并减去主点偏移。
+        normalized_camera_coords = np.array([undistorted_points[0][0][0], undistorted_points[0][0][1], 1.0])
+
+        # 步骤3：将归一化相机坐标通过逆旋转矩阵转换为相机坐标。
+        # 使用相机旋转矩阵的逆（转置）将方向从相机坐标变换到世界坐标。
+        cam_to_world_rotation = np.linalg.inv(R)
+        cam_coords = cam_to_world_rotation.dot(normalized_camera_coords)
+
+        # 步骤4：假设地面水平（Z=0），计算相机坐标系中某一点与地面的交点。
+        # 这里我们假设相机高度已知，并使用此来找到尺度因子。
+        scale_factor = vehicle_height / cam_coords[1]  # 取Y轴高度除以相机高度
+
+        # 计算世界坐标，使用尺度因子。
+        world_coords = scale_factor * cam_coords
+
+        # 加上平移向量，得到最终的世界坐标。
+        world_coords += T
+
+        # 返回世界坐标，Z坐标在此为0。
+        return world_coords
+        
+    @staticmethod
+    def pixel_to_world_new(u, v, camera_matrix, dist_coeffs, R, T, vehicle_height):
+        # 将像素坐标转化为图像坐标
+        uv = np.array([[u, v]], dtype=np.float32)
+
+        # 去畸变并归一化
+        uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs, P=camera_matrix)
+        uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs)
+        # tips此处P参数如果不赋值，该该函数返回的结果
+
+        # 归一化相机坐标系
+        u_n, v_n = uv_undistorted[0][0]
+
+        # 形成归一化的相机坐标
+        normalized_camera_coords = np.array([u_n, v_n, 1.0])
+
+        # 计算比例因子，假设平面高度Z=0,即每个像素换算为世界坐标系对应的距离，以米为单位
+        # 这里，直接利用外参进行变换之前计算比例因子是关键步骤
+        # scale_factor = vehicle_height / (R[2, 0] * normalized_camera_coords[0] + 
+        #                                 R[2, 1] * normalized_camera_coords[1] + 
+        #                                 R[2, 2])
+        scale_factor = vehicle_height / np.dot(R[2], normalized_camera_coords)
+
+        # 乘以比例因子得到相机坐标系中的点
+        camera_coords_scaled = normalized_camera_coords * scale_factor
+
+        # 应用外参变换，将相机坐标系坐标转换到世界坐标系
+        world_coords = np.dot(R, camera_coords_scaled) + T
+
+        # 返回世界坐标
+        return camera_coords_scaled,world_coords[:2]  # 通常假设z=0，返回x和y坐标
+    @staticmethod
+    def image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height):
+        # 去畸变像素点（如果使用的是畸变图像点）
+        uv = np.array([[[u, v]]], dtype=np.float32)
+        uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs, P=camera_matrix)
+        undistorted_points = cv2.undistortPoints(uv, camera_matrix, dist_coeffs,P=camera_matrix)
+
+        # 将像素坐标转换为归一化相机坐标
+        u_n = uv_undistorted[0, 0, 0]
+        v_n = uv_undistorted[0, 0, 1]
+
+        # 转换为齐次坐标
+        normalized_camera_coords = np.array([u_n, v_n, 1.0])
+
+        # 假设地面为平面，求比例因子使点落在 Z = 0 上
+        # 如果知道 vehicle_height（相机到地面的高度），用它来求比例因子
+        scale_factor = vehicle_height / np.dot(R[1], normalized_camera_coords)
+
+        # 计算在相机坐标系中的3D位置
+        point_camera = scale_factor * normalized_camera_coords
+
+        # 将相机坐标转换为车辆坐标
+        point_vehicle = np.dot(R, point_camera) + t
+
+        return point_camera,point_vehicle
     
+    def transation_instance(self):
+        # Example usage
+        # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+        camera_matrix = self.K_cam0
+        # dist_coeffs = np.zeros(5)  # assuming no distortion
+        dist_coeffs = self.dist_coeffs_cam0
+        # R = np.eye(3)  # replace with actual rotation matrix from camera to vehicle
+        # t = np.array([0, 0, vehicle_height])  # replace with actual translation vector
+        R = self.extrinsic_rotation_matrix  # replace with actual rotation matrix from camera to vehicle
+        t = self.extrinsic_transaction_vector  # replace with actual translation vector
+        vehicle_height = t[-1]  # example camera height from ground
+        from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples
+        for item in samples.items():
+            u, v = item[1]
+            print(item[0],u, v, "")
+            point_camera, point_vehicle = self.pixel_to_world_new(u, 
+                                                                  v,
+                                                                  camera_matrix, 
+                                                                  dist_coeffs, 
+                                                                  self.pose_rotation_matrix, 
+                                                                  self.pose_transaction_vector, 
+                                                                  vehicle_height)
+            # point_camera, point_vehicle = self.image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
+            print("point_camera:",point_camera,"\npoint_vehicle:", point_vehicle,"\n")
+        u, v = 1442, 1463  # example pixel coordinates
+        vehicle_height = self.cameraInfo.tz # 车辆高度（单位：米）
+        point_vehicle = self.image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
+        print("Vehicle coordinates:", point_vehicle)
+
+        # 示例使用，输入参数需根据实际摄像机参数调整
+       
+
+        # 计算世界坐标
+        world_point = self.pixel_to_world(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
+        world_point_new = self.pixel_to_world_new(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
+        print("世界坐标:", world_point)
+
     def inverse_perspective_mapping(self, undistorted_img):
         height = int(undistorted_img.shape[0]) # row y
         width = int(undistorted_img.shape[1]) # col x
         
-        ipm_factor = 0.54
+        # 定义IPM参数，定义逆透视变换需要选取的图像范围
+        ipm_factor = 0.6
         
         self.ipmInfo = Info({
             "inputWidth": width,
@@ -125,13 +291,24 @@ class EgoviewReconstruction:
         cameraInfo = self.cameraInfo
         R = undistorted_img
         # vpp = GetVanishingPoint(self.cameraInfo)
+        # 1.获取逆透视变换之后的特征点
+        p_set = []
+        self.transation_instance()
+
+        # 2.获取逆透视变换之后的图像
         vpp = get_vanishing_point(self)
         vp_x = vpp[0][0]
         vp_y = vpp[1][0]
+        print(ipmInfo.top)
         ipmInfo.top = float(max(int(vp_y), ipmInfo.top))
-        uvLimitsp = np.array([[vp_x, ipmInfo.right, ipmInfo.left, vp_x],
-                [ipmInfo.top, ipmInfo.top, ipmInfo.top, ipmInfo.bottom]], np.float32)
+        print(ipmInfo.top)
+        # uvLimitsp = np.array([[vp_x, ipmInfo.right, ipmInfo.left, vp_x],
+        #         [ipmInfo.top, ipmInfo.top, ipmInfo.top, ipmInfo.bottom]], np.float32)
+        uvLimitsp = np.array([[ipmInfo.left, ipmInfo.right, ipmInfo.right, ipmInfo.left],
+                [ipmInfo.top, ipmInfo.top, ipmInfo.bottom, ipmInfo.bottom]], np.float32)
         xyLimits = TransformImage2Ground(uvLimitsp, self.cameraInfo)
+
+        print(xyLimits)
         row1 = xyLimits[0, :]
         row2 = xyLimits[1, :]
         xfMin = min(row1)
@@ -139,10 +316,10 @@ class EgoviewReconstruction:
         yfMin = min(row2)
         yfMax = max(row2)
         xyRatio = (xfMax - xfMin)/(yfMax - yfMin)
-        # target_height = 960
-        # target_width = 960
-        # outImage = np.zeros((target_height,target_width,4), np.float32)
-        outImage = np.zeros((640,960,4), np.float32)
+        target_height = 640
+        target_width = 960
+        outImage = np.zeros((target_height,target_width,4), np.float32)
+        # outImage = np.zeros((640,960,4), np.float32)
         outImage[:,:,3] = 255
         # 输出图片的大小
         outRow = int(outImage.shape[0])
@@ -192,7 +369,9 @@ class EgoviewReconstruction:
 
         outImage = outImage * 255
         print("finished")
-        cv2.imwrite("dist_"+ipm_factor.__str__()+"_inverse_perspective_mapping.jpg", outImage)
+        
+        cv2.imwrite("dist_"+ipm_factor.__str__()+"_inverse_perspective_mapping_1340.jpg", outImage)
+
 
 
 

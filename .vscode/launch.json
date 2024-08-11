@@ -12,6 +12,13 @@
             // "program": "${file}",
             "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
             "console": "integratedTerminal"
+        },{
+            "name": "single_script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
+            "console": "integratedTerminal"
         }
     ]
 }
