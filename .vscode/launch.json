@@ -12,12 +12,21 @@
             // "program": "${file}",
             "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
             "console": "integratedTerminal"
-        },{
+        },
+        {
             "name": "single_script",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "三维",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "python": "F:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
             "console": "integratedTerminal"
         }
     ]

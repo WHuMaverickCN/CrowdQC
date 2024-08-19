@@ -3,8 +3,19 @@ import json
 import configparser
 import geopandas as gpd
 import pandas as pd
+import pickle
 
+def read_loc_data(path):
+    df = pd.read_csv(path)    
+    return df
+    
 #此类别中需要编写关于读取
+def read_mask_data(path,mask_type="mask"): 
+    with open(path, 'rb') as f:
+    # 使用pickle.load加载数据
+        loaded_data = pickle.load(f)
+    return loaded_data
+
 def read_vec_data(path):
     with open(path,"r") as fp:
         _content = fp.read()
@@ -42,7 +53,7 @@ def read_sample_location_file(location_paths):
     # 迭代地合并 DataFrame
     for df in df_loc_set.values():
         merged_df = pd.concat([merged_df, df], ignore_index=True)
-        
+
     return merged_df
 
 def raed_feather(feather_path):

@@ -4,9 +4,9 @@ from src.pose.pipeline import PositionErrorPredictPipeline
 from src.reconstruction.egoview import EgoviewReconstruction
 if __name__ == "__main__":
     # 使用示例
-    reconstruction = EgoviewReconstruction(path_to_data='some_path')
-    undistorted_img = reconstruction.get_undistort_img()
-    reconstruction.inverse_perspective_mapping(undistorted_img)
+    # reconstruction = EgoviewReconstruction(path_to_data='some_path')
+    # undistorted_img = reconstruction.get_undistort_img()
+    # reconstruction.inverse_perspective_mapping(undistorted_img)
 
     #根据目标车端矢量数据查询当前数据的配到多源数据并打包
     target_vec_slice = "1690354775327700_1690354780995200_PE.geojson"

@@ -1,13 +1,24 @@
+import os
 import cv2
+import geojson
 import numpy as np
+from pathlib import Path
+from math import pi
+import glob
 
 from src.reconstruction.vanishing_point_utils import get_vanishing_point
 from .transformation_utils import *
+from .landmark_utils import *
 from .TransformGround2Image import TransformGround2Image
 from .TransformImage2Ground import TransformImage2Ground
-from math import pi
+
+from ..io import input
 
 np.set_printoptions(precision=6, suppress=True)
+
+DEFAULT_MASK_FILE_PATH = "output/0/array_mask"
+DEFAULT_PROCESSED_DAT_PATH = "output/0"
+DEFAULT_PROCESSED_DAT_LOC_PATH = "output/0/loc2vis.csv"
 
 class Info(object):
     def __init__(self, dct):
@@ -67,6 +78,7 @@ class EgoviewReconstruction:
             "rz":-0.006632-pi/2
         })
 
+
         self.six_dof_data = np.array([self.cameraInfo.tx, 
                                  self.cameraInfo.ty, 
                                  self.cameraInfo.tz, 
@@ -76,6 +88,7 @@ class EgoviewReconstruction:
         
         rot_mat_ca,trans_vec_ca = self.get_camera_pose()
         self.extrinsic_matrix = camera_pose_to_extrinsic(rot_mat_ca,trans_vec_ca)
+        print("extrinsic_matrix:\n",self.extrinsic_matrix)
         self.extrinsic_rotation_matrix = self.extrinsic_matrix[:3,:3]
         self.extrinsic_transaction_vector = self.extrinsic_matrix[:3,3]
         # self.extrinsic_rotation_matrix = 
@@ -126,7 +139,7 @@ class EgoviewReconstruction:
         extrinsic_matrix_rt = camera_pose_to_extrinsic(R_matrix,T_vec)
         print(f"自车坐标系原点在相机坐标系的x，y，z向量坐标：\n{extrinsic_matrix_rt @ (np.array([[0,0,0,1]]).T)}")
         return R_matrix,T_vec,extrinsic_matrix_rt#pose_matrix
-
+    
     def get_undistort_img(self, temp='ca_cam0_sample'):
         image = cv2.imread(f"{temp}.jpg")
         if image is None:
@@ -209,6 +222,7 @@ class EgoviewReconstruction:
 
         # 返回世界坐标
         return camera_coords_scaled,world_coords[:2]  # 通常假设z=0，返回x和y坐标
+    
     @staticmethod
     def image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height):
         # 去畸变像素点（如果使用的是畸变图像点）
@@ -235,6 +249,8 @@ class EgoviewReconstruction:
 
         return point_camera,point_vehicle
     
+    
+
     def transation_instance(self):
         # Example usage
         # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
@@ -246,6 +262,63 @@ class EgoviewReconstruction:
         R = self.extrinsic_rotation_matrix  # replace with actual rotation matrix from camera to vehicle
         t = self.extrinsic_transaction_vector  # replace with actual translation vector
         vehicle_height = t[-1]  # example camera height from ground
+
+        format_str = "Camera matrix:\n{}\nDistortion coefficients: {}"
+        print(format_str.format(camera_matrix, dist_coeffs))
+
+        mask_path = str(Path(DEFAULT_MASK_FILE_PATH).absolute())
+        if os.path.isdir(mask_path):
+            files = sorted(glob.glob(os.path.join(mask_path, '*.*'))) 
+        
+        fixed_param = {
+            "camera_matrix": camera_matrix,
+            "dist_coeffs": dist_coeffs,
+            "R": self.pose_rotation_matrix,
+            "t": self.pose_transaction_vector,
+            "vehicle_height": vehicle_height
+        }
+        features = []
+
+        #读取包含定位数据
+        _loc_path = str(Path(DEFAULT_PROCESSED_DAT_LOC_PATH).absolute())
+        loc_data_df = input.read_loc_data(_loc_path)
+        
+        for file in files:
+            q,world_coords_from_ins = get_quaternion_and_coordinates(loc_data_df,file,"pic_0")
+            print(file)
+            sem_seg = read_segmentation_mask_from_pickle(file)
+            instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,fixed_param)
+            # ins_seg = semantic_to_instance_segmentation(sem_seg)
+            # print(instance_edge_points_list)
+            
+            for _edge_points_for_one_instance in instance_edge_points_list:
+                print(len(instance_edge_points_list))
+                coordinates = []
+                for pixel in _edge_points_for_one_instance:
+                    point_camera, point_vehicle = self.pixel_to_world_new(pixel[0],
+                                                                        pixel[1], 
+                                                                        camera_matrix, 
+                                                                        dist_coeffs, 
+                                                                        self.pose_rotation_matrix, 
+                                                                        self.pose_transaction_vector, 
+                                                                        vehicle_height)
+                    # trans_ego_coord_to
+                    
+                    coordinates.append((point_vehicle[0], point_vehicle[1]))  # 添加点坐标到坐标列表中
+
+                    print("point_camera:",\
+                        point_camera,\
+                        "\npoint_vehicle:",\
+                        point_vehicle,"\n")
+                feature = geojson.Feature(
+                    geometry=geojson.Polygon([coordinates]),  # 使用Polygon表示该实例的边界
+                    properties={"file_name": os.path.basename(file)}  # 将文件名作为属性
+                )
+                features.append(feature)
+        feature_collection = geojson.FeatureCollection(features)
+        with open('output.geojson', 'w') as f:
+            geojson.dump(feature_collection, f)   
+        # 示例使用，输入参数需根据实际摄像机参数调整
         from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples
         for item in samples.items():
             u, v = item[1]
@@ -372,6 +445,17 @@ class EgoviewReconstruction:
         
         cv2.imwrite("dist_"+ipm_factor.__str__()+"_inverse_perspective_mapping_1340.jpg", outImage)
 
-
-
+def read_segmentation_mask_from_pickle(mask_path):
+    """
+    从pickle文件中读取语义分割的mask图层。
+    
+    参数:
+        mask_path (str): 语义分割的mask文件路径。
+    
+    返回:
+        semantic_mask (numpy.ndarray): 语义分割的结果，大小为 (H, W)，
+                                       每个像素值表示类别标签。
+    """
+    semantic_mask = input.read_mask_data(mask_path)
+    return semantic_mask
 

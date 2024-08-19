@@ -1,10 +1,18 @@
 import cv2
 import numpy as np
-import pyproj
+from pyproj import Transformer
 from scipy.spatial.transform import Rotation as sciR
 np.set_printoptions(precision=6, suppress=True)
 from math import pi
 
+_lon = 106.4417403
+_lat = 29.49942031
+
+CHANGAN_EGO_TO_WORLD = {
+    "rx":0.008,
+    "ry":pi/2+0.003,
+    "rz":-pi/2+0.001
+}
 CHANGAN_RAW_RPH = {
     "tx":1.77,
     "ty":0.07,
@@ -136,6 +144,38 @@ def pose_to_extrinsic(pose_matrix):
 
     return R_extrinsic, t_extrinsic
 
+@staticmethod
+def pixel_to_world_coords(u, v, camera_matrix, dist_coeffs, R, T, vehicle_height):
+    # 将像素坐标转化为图像坐标
+    uv = np.array([[u, v]], dtype=np.float32)
+
+    # 去畸变并归一化
+    uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs, P=camera_matrix)
+    uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs)
+    # tips此处P参数如果不赋值，该该函数返回的结果
+
+    # 归一化相机坐标系
+    u_n, v_n = uv_undistorted[0][0]
+
+    # 形成归一化的相机坐标
+    normalized_camera_coords = np.array([u_n, v_n, 1.0])
+
+    # 计算比例因子，假设平面高度Z=0,即每个像素换算为世界坐标系对应的距离，以米为单位
+    # 这里，直接利用外参进行变换之前计算比例因子是关键步骤
+    # scale_factor = vehicle_height / (R[2, 0] * normalized_camera_coords[0] + 
+    #                                 R[2, 1] * normalized_camera_coords[1] + 
+    #                                 R[2, 2])
+    scale_factor = vehicle_height / np.dot(R[2], normalized_camera_coords)
+
+    # 乘以比例因子得到相机坐标系中的点
+    camera_coords_scaled = normalized_camera_coords * scale_factor
+
+    # 应用外参变换，将相机坐标系坐标转换到世界坐标系
+    world_coords = np.dot(R, camera_coords_scaled) + T
+
+    # 返回世界坐标
+    return camera_coords_scaled,world_coords[:2]  # 通常假设z=0，返回x和y坐标
+
 if __name__ == "__main__":
     # 通过四元数，构建相机位姿矩阵
     quanternion = [
@@ -155,8 +195,8 @@ if __name__ == "__main__":
     print(rot.as_euler('xyz', degrees=True))
     print(rot.as_euler('zxy', degrees=True))
     print(rot.as_euler('zyx', degrees=True))
+    
     rot_mat = rot.as_matrix()
-
     rot_vec = rot.as_rotvec(degrees=True)
     print(f"根据四元数计算的旋转向量结果为：\n{rot_vec}")
     trans_vec = np.array(trans)
@@ -192,3 +232,37 @@ if __name__ == "__main__":
     trans_vec_ca = np.array(trans_ca)
     extrinsic_matrix_rt_ca = camera_pose_to_extrinsic(rot_mat_ca,trans_vec_ca)
     rot_mat = rot.as_matrix()
+
+def trans_ego_to_world_coord(point_vehicle,quanternion = [-0.007898,
+                                                        0.005866,
+                                                        0.726457,
+                                                        0.687141]):
+    '''
+    # 将车端x,y,z坐标转化为世界坐标
+    # 输入一个点，输出一个点
+    # 此处输入的四元数为长安汽车官方ins数据中解析得到，通常每一帧均需要读取一个四元数
+    # 输入quanterion为[x,y,z,w]形式的列表
+    '''
+
+    rot = sciR.from_quat(quanternion)
+    rot_matrix = rot.as_matrix()
+    point_world = np.dot(rot_matrix, point_vehicle)
+
+    return point_world
+
+def from_wgs84_to_target_proj(lat,lon,source_proj = "epsg:4326",target_proj = "epsg:32648"):
+    # 输入一个经纬度，输出投影坐标，默认为根据地理坐标系转为重庆地区(102°E-108°E)的CGCD2000-6度带投影坐标系 WGS 84 / UTM zone 48N
+    # 该坐标为东、北坐标系，即Axes: Easting, Northing (E,N)
+    # 即x表示东方向，y表示北方向
+    # x通常为六位数，y通常为七位数，否则改坐标通常存在问题
+    m_transformer = Transformer.from_crs(source_proj,target_proj)
+    x,y = m_transformer.transform(lat,lon)
+    # print(x,y)
+    return x,y
+def trans_instance_to_shape():
+    # 输入一个EPSG42638的点集，输出一个矢量图层，该图层包含所有实例对应的矢量图形
+    # 
+    pass
+
+# from_wgs84_to_target_proj(_lat,_lon)
+# trans_ego_to_world_coord((0,0,0))
