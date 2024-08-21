@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pandas as pd
 from pyproj import Transformer
 from scipy.spatial.transform import Rotation as sciR
 np.set_printoptions(precision=6, suppress=True)
@@ -233,10 +234,11 @@ if __name__ == "__main__":
     extrinsic_matrix_rt_ca = camera_pose_to_extrinsic(rot_mat_ca,trans_vec_ca)
     rot_mat = rot.as_matrix()
 
-def trans_ego_to_world_coord(point_vehicle,quanternion = [-0.007898,
-                                                        0.005866,
-                                                        0.726457,
-                                                        0.687141]):
+def trans_ego_to_world_coord(
+        point_vehicle:np.ndarray,
+        quanternion:list,
+        geographical_coords:list,
+    )->np.ndarray:
     '''
     # 将车端x,y,z坐标转化为世界坐标
     # 输入一个点，输出一个点
@@ -245,12 +247,34 @@ def trans_ego_to_world_coord(point_vehicle,quanternion = [-0.007898,
     '''
 
     rot = sciR.from_quat(quanternion)
+    # print(rot.as_euler('xyz', degrees=True))
+    # return 
     rot_matrix = rot.as_matrix()
-    point_world = np.dot(rot_matrix, point_vehicle)
 
-    return point_world
+    rot_matrix_inv = np.linalg.inv(rot_matrix)
+    point_world = np.dot(rot_matrix_inv, point_vehicle)
 
-def from_wgs84_to_target_proj(lat,lon,source_proj = "epsg:4326",target_proj = "epsg:32648"):
+    utm_point_x,utm_point_y = from_raw_point_world_to_utm(point_world[0],point_world[1])
+
+    # 即x表示东方向，y表示北方向
+    ins_x,ins_y = from_wgs84_to_target_proj(geographical_coords[1],geographical_coords[0])
+
+    # x方向为北，y方向为西
+    # 该函数将自车坐标拽到x方向为北，y方向为西的的坐标系下
+    return utm_point_x+ins_x,utm_point_y+ins_y
+def from_raw_point_world_to_utm(raw_x,raw_y):
+    new_x = -raw_y
+    new_y = raw_x
+    # 输入一个点，输出一个点
+    # 该函数将自车坐标拽到x方向为东，y方向为北的的坐标系下
+    return new_x,new_y
+
+
+def from_wgs84_to_target_proj(
+        lat,
+        lon,
+        source_proj = "epsg:4326",
+        target_proj = "epsg:32648"):
     # 输入一个经纬度，输出投影坐标，默认为根据地理坐标系转为重庆地区(102°E-108°E)的CGCD2000-6度带投影坐标系 WGS 84 / UTM zone 48N
     # 该坐标为东、北坐标系，即Axes: Easting, Northing (E,N)
     # 即x表示东方向，y表示北方向
@@ -259,10 +283,15 @@ def from_wgs84_to_target_proj(lat,lon,source_proj = "epsg:4326",target_proj = "e
     x,y = m_transformer.transform(lat,lon)
     # print(x,y)
     return x,y
+
 def trans_instance_to_shape():
     # 输入一个EPSG42638的点集，输出一个矢量图层，该图层包含所有实例对应的矢量图形
-    # 
     pass
 
 # from_wgs84_to_target_proj(_lat,_lon)
 # trans_ego_to_world_coord((0,0,0))
+
+def match_trajectory_to_insdata(trajectory:str,
+                                ins_data:pd.DataFrame):
+    pass
+    # 将ins_data匹配到traj_data，构建点到点的映射关系

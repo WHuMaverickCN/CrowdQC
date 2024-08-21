@@ -16,9 +16,9 @@ from ..io import input
 
 np.set_printoptions(precision=6, suppress=True)
 
-DEFAULT_MASK_FILE_PATH = "output/0/array_mask"
-DEFAULT_PROCESSED_DAT_PATH = "output/0"
-DEFAULT_PROCESSED_DAT_LOC_PATH = "output/0/loc2vis.csv"
+DEFAULT_MASK_FILE_PATH = "output/1/array_mask"
+DEFAULT_PROCESSED_DAT_PATH = "output/1"
+DEFAULT_PROCESSED_DAT_LOC_PATH = "output/1/loc2vis.csv"
 
 class Info(object):
     def __init__(self, dct):
@@ -28,7 +28,7 @@ class Info(object):
         return self.dct[name]
     
 class EgoviewReconstruction:
-    def __init__(self, path_to_data):
+    def __init__(self, path_to_data=""):
         
         self.path_to_data = path_to_data
         # 假设这些参数是从配置或文件中读取的
@@ -221,7 +221,8 @@ class EgoviewReconstruction:
         world_coords = np.dot(R, camera_coords_scaled) + T
 
         # 返回世界坐标
-        return camera_coords_scaled,world_coords[:2]  # 通常假设z=0，返回x和y坐标
+        return camera_coords_scaled,world_coords
+        # return camera_coords_scaled,world_coords[:2]  # 通常假设z=0，返回x和y坐标
     
     @staticmethod
     def image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height):
@@ -285,6 +286,9 @@ class EgoviewReconstruction:
         
         for file in files:
             q,world_coords_from_ins = get_quaternion_and_coordinates(loc_data_df,file,"pic_0")
+            # print(q,world_coords_from_ins)
+            if q == None and world_coords_from_ins==None:
+                continue
             print(file)
             sem_seg = read_segmentation_mask_from_pickle(file)
             instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,fixed_param)
@@ -292,7 +296,7 @@ class EgoviewReconstruction:
             # print(instance_edge_points_list)
             
             for _edge_points_for_one_instance in instance_edge_points_list:
-                print(len(instance_edge_points_list))
+                # print(len(instance_edge_points_list))
                 coordinates = []
                 for pixel in _edge_points_for_one_instance:
                     point_camera, point_vehicle = self.pixel_to_world_new(pixel[0],
@@ -303,20 +307,26 @@ class EgoviewReconstruction:
                                                                         self.pose_transaction_vector, 
                                                                         vehicle_height)
                     # trans_ego_coord_to
-                    
-                    coordinates.append((point_vehicle[0], point_vehicle[1]))  # 添加点坐标到坐标列表中
+                    point_world = trans_ego_to_world_coord(point_vehicle, q, world_coords_from_ins)
+                    # print(point_world)
+                    # q,world_coords_from_ins
+                    # coordinates.append((point_vehicle[0], point_vehicle[1],0))  # 添加点坐标到坐标列表中
+                    coordinates.append((point_world[0], point_world[1],0.0))  # 添加点坐标到坐标列表中
 
-                    print("point_camera:",\
-                        point_camera,\
-                        "\npoint_vehicle:",\
-                        point_vehicle,"\n")
+                    # print(
+                    #     "point_camera:",\
+                    #     point_camera,\
+                    #     "\npoint_vehicle:",\
+                    #     point_vehicle,"\n",
+                    #     "point_world:",\
+                    #     point_world)
                 feature = geojson.Feature(
                     geometry=geojson.Polygon([coordinates]),  # 使用Polygon表示该实例的边界
                     properties={"file_name": os.path.basename(file)}  # 将文件名作为属性
                 )
                 features.append(feature)
         feature_collection = geojson.FeatureCollection(features)
-        with open('output.geojson', 'w') as f:
+        with open('intent_output_world.geojson', 'w') as f:
             geojson.dump(feature_collection, f)   
         # 示例使用，输入参数需根据实际摄像机参数调整
         from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples
@@ -345,6 +355,8 @@ class EgoviewReconstruction:
         world_point_new = self.pixel_to_world_new(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
         print("世界坐标:", world_point)
 
+    def batch_ego_reconstruction(self):
+        self.transation_instance()
     def inverse_perspective_mapping(self, undistorted_img):
         height = int(undistorted_img.shape[0]) # row y
         width = int(undistorted_img.shape[1]) # col x

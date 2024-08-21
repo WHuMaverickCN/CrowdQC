@@ -116,8 +116,8 @@ class CoordProcessor:
 class TimeStampProcessor:
     @staticmethod
     def get_extra_suffix_dataframe(_dataframe):
-        _dataframe['sec_of_week_last_three'] = _dataframe['sec_of_week'].astype(str).str[-3:].astype(float) / 1000
-        _dataframe['utc'] = _dataframe['utc'] + _dataframe['sec_of_week_last_three']
+        # _dataframe['sec_of_week_last_three'] = _dataframe['sec_of_week'].astype(str).str[-3:].astype(float) / 1000
+        # _dataframe['utc'] = _dataframe['utc'] + _dataframe['sec_of_week_last_three']
 
         return _dataframe
     @staticmethod
@@ -451,6 +451,8 @@ class DataSamplePathWrapper:
         # 将找到的行拼接到loc_data中
         mathced_result = pd.concat([self.loc_data.reset_index(drop=True), closest_rows.reset_index(drop=True)], axis=1)
         
+        
+
         def is_valid_image_string(img):
             # 检查 img 是否是字符串，并且以 '_0.jpg' 或 '_1.jpg' 结尾
             return isinstance(img, str) and (img.endswith('_0.jpg') or img.endswith('_1.jpg'))
@@ -461,6 +463,12 @@ class DataSamplePathWrapper:
         
         camera_0_images = [os.path.join(self.vis_path[0],item) for item in camera_0_images]
         camera_1_images = [os.path.join(self.vis_path[0],item) for item in camera_1_images]
+        
+        #添加反偏转
+        def convert_row(row):
+            new_lng, new_lat = CoordProcessor.gcj02towgs84_point_level(row['longitude'], row['latitude'])
+            return pd.Series([new_lng, new_lat], index=['new_longitude', 'new_latitude'])
+        mathced_result[['new_longitude', 'new_latitude']] = mathced_result.apply(convert_row, axis=1)
         
         return mathced_result,{'cam_0':camera_0_images,'cam_1':camera_1_images}
 

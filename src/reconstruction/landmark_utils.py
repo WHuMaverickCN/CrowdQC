@@ -103,7 +103,7 @@ def if_in_util_feild(pixel_value):
 
 def mask_upper_60_percent(image, output_path='mask_image_6.png'):
     height = image.shape[0]
-    cutoff = int(height * 0.6)
+    cutoff = int(height * 0.65)
 
     # 将上面60%的区域置为黑色
     image[:cutoff, :] = 0
@@ -294,7 +294,7 @@ def match_simplified_points_to_instances(maskA, simplified_edge_points):
             # 在输出mask中将这些点标记为当前实例的标签值
             for (x, y) in instance_edge_points:
                 labeled_instance_mask[y, x] = instance_label
-    save_colored_instances(labeled_instance_mask, 'colored_instances.png')
+    # save_colored_instances(labeled_instance_mask, 'colored_instances.png')
     return labeled_instance_mask, instance_edge_points_list
 
 def save_colored_instances(mask, save_path, thickness=3):
@@ -349,16 +349,27 @@ def get_quaternion_and_coordinates(df, pic_value, comparison_field="pic_0"):
     file_name = os.path.basename(pic_value).replace("_seg_mask.pkl", ".jpg")
     matched_rows = df[df[comparison_field] == file_name]
 
-
-
     if not matched_rows.empty:
+        print(matched_rows['utc'].mean())
         # 获取对应行的 q_w, q_x, q_y, q_z 列
-        quaternion_list = matched_rows[['q_w', 'q_x', 'q_y', 'q_z']].values.tolist()
+        quaternion_list = matched_rows[['q_x', 'q_y', 'q_z','q_w']].values.tolist()
 
         # 获取 longitude 和 latitude 列
-        longitude = matched_rows['longitude'].values.tolist()
-        latitude = matched_rows['latitude'].values.tolist()
+        # longitude = matched_rows['longitude_new'].values.tolist()
+        # latitude = matched_rows['latitude_new'].values.tolist()
+        longitude = matched_rows['new_longitude'].values.tolist()
+        latitude = matched_rows['new_latitude'].values.tolist()
 
-        return quaternion_list, longitude, latitude
+        quaternions_array = np.array(quaternion_list)
+        average_quaternion = np.mean(quaternions_array, axis=0)
+        average_quaternion_list = average_quaternion.tolist()
+
+        longitude = np.array(longitude)
+        latitude = np.array(latitude)
+
+        avg_longitude = np.mean(longitude, axis=0)
+        avg_latitude = np.mean(latitude, axis=0)
+
+        return average_quaternion_list, (avg_longitude, avg_latitude)
     else:
-        return None, (None, None)
+        return None, None
