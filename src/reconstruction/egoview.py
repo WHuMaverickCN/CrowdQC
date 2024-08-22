@@ -16,9 +16,9 @@ from ..io import input
 
 np.set_printoptions(precision=6, suppress=True)
 
-DEFAULT_MASK_FILE_PATH = "output/1/array_mask"
-DEFAULT_PROCESSED_DAT_PATH = "output/1"
-DEFAULT_PROCESSED_DAT_LOC_PATH = "output/1/loc2vis.csv"
+DEFAULT_MASK_FILE_PATH = "output/4/array_mask"
+DEFAULT_PROCESSED_DAT_PATH = "output/4"
+DEFAULT_PROCESSED_DAT_LOC_PATH = "output/4/loc2vis.csv"
 
 class Info(object):
     def __init__(self, dct):
@@ -326,7 +326,7 @@ class EgoviewReconstruction:
                 )
                 features.append(feature)
         feature_collection = geojson.FeatureCollection(features)
-        with open('intent_output_world.geojson', 'w') as f:
+        with open('intent_output_world_065.geojson', 'w') as f:
             geojson.dump(feature_collection, f)   
         # 示例使用，输入参数需根据实际摄像机参数调整
         from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples

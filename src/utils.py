@@ -465,10 +465,10 @@ class DataSamplePathWrapper:
         camera_1_images = [os.path.join(self.vis_path[0],item) for item in camera_1_images]
         
         #添加反偏转
-        def convert_row(row):
-            new_lng, new_lat = CoordProcessor.gcj02towgs84_point_level(row['longitude'], row['latitude'])
-            return pd.Series([new_lng, new_lat], index=['new_longitude', 'new_latitude'])
-        mathced_result[['new_longitude', 'new_latitude']] = mathced_result.apply(convert_row, axis=1)
+        # def convert_row(row):
+        #     new_lng, new_lat = CoordProcessor.gcj02towgs84_point_level(row['longitude'], row['latitude'])
+        #     return pd.Series([new_lng, new_lat], index=['new_longitude', 'new_latitude'])
+        # mathced_result[['new_longitude', 'new_latitude']] = mathced_result.apply(convert_row, axis=1)
         
         return mathced_result,{'cam_0':camera_0_images,'cam_1':camera_1_images}
 

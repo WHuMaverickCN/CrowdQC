@@ -17,6 +17,9 @@ if __name__ == "__main__":
     reconstruction.batch_ego_reconstruction()
 
     #根据目标车端矢量数据查询当前数据的配到多源数据并打包
-    target_vec_slice = "1690354775327700_1690354780995200_PE.geojson"
+    target_vec_slice = "1690353428424700_1690353430258800_PE.geojson"
+    # target_vec_slice = "1690353426889700_1690353428890700_PE.geojson"
+    # target_vec_slice = "1690353425624699_1690353426890700_PE.geojson"
+    # target_vec_slice = "1690354775327700_1690354780995200_PE.geojson"
     pipeline = PositionErrorPredictPipeline(target_vec_slice,"config.ini")
     print("this is the gate")

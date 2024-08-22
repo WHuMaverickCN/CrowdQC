@@ -19,7 +19,7 @@ def write_to_foler(full_vec_path,#  矢量全路径
                    loc_data_2_vis_data,
                    vis_data_dict,
                    target_folder='output',
-                   index='1'):# 目标路径
+                   index='4'):# 目标路径
     # 检查目标文件夹是否存在，如果不存在则创建它
     target_sample_folder = os.path.join(target_folder,index) 
     if not os.path.exists(target_sample_folder):
