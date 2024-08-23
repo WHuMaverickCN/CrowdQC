@@ -11,3 +11,4 @@ requirements.txt
 
 # 屏蔽生成的图片
 *.jpg
+*.log
