@@ -1,3 +1,13 @@
-output
-temp_geo
-temp_image
+# 屏蔽那些文件夹
+output/
+temp_geo/
+temp_image/
+
+.vscode/
+
+# 屏蔽特定名称
+config.ini
+requirements.txt
+
+# 屏蔽生成的图片
+*.jpg
