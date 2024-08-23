@@ -9,7 +9,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py", //"${file}",
-            // "program": "${file}",
+            // "program": "${file}",#test ignore
             "python": "D:\\Users\\31505\\miniconda3\\envs\\pytorch\\python.exe",
             "console": "integratedTerminal"
         },
