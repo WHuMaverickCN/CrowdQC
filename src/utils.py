@@ -1,5 +1,6 @@
 import re
 import os
+import uuid
 import math
 import datetime
 from dataclasses import dataclass
@@ -347,7 +348,8 @@ class DataSearcher:
         if len(matching_files)!=0:
             return matching_files,data_package_name_list
         else:
-            print("No matching files found.")
+            # print("No matching files found.")
+            return -1,-1
 
 @dataclass
 class DataSamplePathWrapper:
@@ -364,15 +366,27 @@ class DataSamplePathWrapper:
         self.loc_data = self.__match_vec_to_loc()
         self.loc_2_vis,self.vis_data = self.__match_vec_to_vis_TR()
 
-    def write_sample_to_target_folder(self,target_folder="."):
+    def write_sample_to_target_folder(self,target_folder,id):
         # 写入文件到目标文件夹
-        output.write_to_foler(
-                            self.vec_path,
-                            self.traj_path,
-                            self.loc_data,
-                            self.loc_2_vis,
-                            self.vis_data
-                        )
+        if id == True:
+            index = uuid.uuid4()
+            output.write_to_foler(self.vec_path,
+                                self.traj_path,
+                                self.loc_data,
+                                self.loc_2_vis,
+                                self.vis_data,
+                                target_folder = target_folder,
+                                index = index
+                            )
+        else:
+        # 不带id的写入过程,index按照默认执行
+            output.write_to_foler(self.vec_path,
+                                self.traj_path,
+                                self.loc_data,
+                                self.loc_2_vis,
+                                self.vis_data,
+                                target_folder = target_folder
+                            )
     
     def __match_vec_to_vis_TR(self):
         _all_pic = []
@@ -464,7 +478,7 @@ class DataSamplePathWrapper:
         camera_0_images = [os.path.join(self.vis_path[0],item) for item in camera_0_images]
         camera_1_images = [os.path.join(self.vis_path[0],item) for item in camera_1_images]
         
-        #添加反偏转
+        # #添加反偏转
         # def convert_row(row):
         #     new_lng, new_lat = CoordProcessor.gcj02towgs84_point_level(row['longitude'], row['latitude'])
         #     return pd.Series([new_lng, new_lat], index=['new_longitude', 'new_latitude'])

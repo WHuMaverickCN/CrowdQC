@@ -4,12 +4,16 @@ from ..io import input
 from ..utils import *
 
 class PositionErrorPredictPipeline():
-    def __init__(self,vec_path,config_file):
+    def __init__(self,
+                 vec_path="",
+                 config_file="config.ini",
+                 id = True,
+                 target_folder = 'output'):
         self.vec_path = vec_path
+        self.id_flag = id
+        self.target_folder = target_folder
         self.read_config(config_file)
         self.get_target_traj_path()
-        if os.path.exists(vec_path):
-            print(vec_path)
 
     def read_config(self,_path):
         feature_file_path,location_file_path,vision_file_path = input.read_config_file(_path)
@@ -47,14 +51,23 @@ class PositionErrorPredictPipeline():
         _gf_end_time = TimeStampProcessor.trans_timestamp_to_general_format(end_time)
 
         target_loc_data_package,package_names = DataSearcher.get_raw_data_package(self.location_file_path,_gf_start_time,_gf_end_time)
-
+        if target_loc_data_package == -1 and package_names == -1:
+            print(f"skip:{self.vec_path}")
+            return
         for package_name in package_names:
             target_vis_data_package = DataSearcher.get_target_shape_data_path(self.vision_file_path, package_name)
+        
+        if len(target_loc_data_package)==0 or len(target_vis_data_package)==0:
+            print(f"skip:{self.vec_path}")
+            return
         # 封装文件路径为DataSamplePathWrapper对象
-        if len(full_traj_path_list) == 1 and len(full_vec_path_list) == 1:
+        if len(full_traj_path_list) >= 1 and len(full_vec_path_list) >= 1:
             full_traj_path = full_traj_path_list[0]
             full_vec_path = full_vec_path_list[0]
-            _current_sample = DataSamplePathWrapper(full_vec_path,full_traj_path, target_loc_data_package,target_vis_data_package)
-            _current_sample.write_sample_to_target_folder()
-            pass
+            _current_sample = DataSamplePathWrapper(full_vec_path,
+                                                    full_traj_path, 
+                                                    target_loc_data_package,
+                                                    target_vis_data_package)
+            _current_sample.write_sample_to_target_folder(self.target_folder,self.id_flag)
+
 

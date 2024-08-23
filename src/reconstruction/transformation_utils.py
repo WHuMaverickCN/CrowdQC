@@ -262,13 +262,13 @@ def trans_ego_to_world_coord(
     # x方向为北，y方向为西
     # 该函数将自车坐标拽到x方向为北，y方向为西的的坐标系下
     return utm_point_x+ins_x,utm_point_y+ins_y
+
 def from_raw_point_world_to_utm(raw_x,raw_y):
     new_x = -raw_y
     new_y = raw_x
     # 输入一个点，输出一个点
     # 该函数将自车坐标拽到x方向为东，y方向为北的的坐标系下
     return new_x,new_y
-
 
 def from_wgs84_to_target_proj(
         lat,
