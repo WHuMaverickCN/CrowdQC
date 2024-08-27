@@ -2,6 +2,7 @@
 output/
 temp_geo/
 temp_image/
+reconstruction_output/
 
 .vscode/
 
