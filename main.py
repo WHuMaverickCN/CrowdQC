@@ -26,8 +26,9 @@ if __name__ == "__main__":
     '''
 
     # 使用2: 批量进行车道线重建
-    # reconstruction = EgoviewReconstruction()
-    # reconstruction.batch_ego_reconstruction()
+    target_recons_dir = "output"
+    reconstruction = EgoviewReconstruction()
+    reconstruction.batch_ego_reconstruction(target_recons_dir)
 
     #根据目标车端矢量数据查询当前数据的配到多源数据并打包
     import os

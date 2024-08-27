@@ -252,7 +252,11 @@ class EgoviewReconstruction:
     
     
 
-    def transation_instance(self):
+    def transation_instance(self,
+                            DEFAULT_MASK_FILE_PATH,
+                            DEFAULT_PROCESSED_DAT_LOC_PATH,
+                            output_file_name,
+                            default_output_path = "reconstruction_output/"):
         # Example usage
         # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
         camera_matrix = self.K_cam0
@@ -270,7 +274,8 @@ class EgoviewReconstruction:
         mask_path = str(Path(DEFAULT_MASK_FILE_PATH).absolute())
         if os.path.isdir(mask_path):
             files = sorted(glob.glob(os.path.join(mask_path, '*.*'))) 
-        
+        else:
+            return
         fixed_param = {
             "camera_matrix": camera_matrix,
             "dist_coeffs": dist_coeffs,
@@ -326,8 +331,13 @@ class EgoviewReconstruction:
                 )
                 features.append(feature)
         feature_collection = geojson.FeatureCollection(features)
-        with open('intent_output_world_065.geojson', 'w') as f:
-            geojson.dump(feature_collection, f)   
+        if os.path.exists(default_output_path)==False:
+            os.mkdir(default_output_path)
+        with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
+            geojson.dump(feature_collection, f)
+            # with open('intent_output_world_065.geojson', 'w') as f:
+            #     geojson.dump(feature_collection, f)   
+        return
         # 示例使用，输入参数需根据实际摄像机参数调整
         from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples
         for item in samples.items():
@@ -355,8 +365,18 @@ class EgoviewReconstruction:
         world_point_new = self.pixel_to_world_new(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
         print("世界坐标:", world_point)
 
-    def batch_ego_reconstruction(self):
-        self.transation_instance()
+    def batch_ego_reconstruction(self,target_dir="output"):
+        files = os.listdir(target_dir)
+        for file in files:
+            print(file)
+            temp_data_root = os.path.join(target_dir, file)
+            temp_mask_path = os.path.join(temp_data_root, "array_mask")
+            temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
+            self.transation_instance(
+                DEFAULT_MASK_FILE_PATH=temp_mask_path,
+                DEFAULT_PROCESSED_DAT_LOC_PATH=temp_loc_file,
+                output_file_name=file
+            )
     def inverse_perspective_mapping(self, undistorted_img):
         height = int(undistorted_img.shape[0]) # row y
         width = int(undistorted_img.shape[1]) # col x
