@@ -316,7 +316,8 @@ class EgoviewReconstruction:
                     # print(point_world)
                     # q,world_coords_from_ins
                     # coordinates.append((point_vehicle[0], point_vehicle[1],0))  # 添加点坐标到坐标列表中
-                    coordinates.append((point_world[0], point_world[1],0.0))  # 添加点坐标到坐标列表中
+                    # coordinates.append((point_world[0], point_world[1],0.0))  # 添加点坐标到坐标列表中
+                    coordinates.append((point_world[0], point_world[1]))  # 添加点坐标到坐标列表中
 
                     # print(
                     #     "point_camera:",\
@@ -325,6 +326,7 @@ class EgoviewReconstruction:
                     #     point_vehicle,"\n",
                     #     "point_world:",\
                     #     point_world)
+                coordinates = simplify_polygon(coordinates)
                 feature = geojson.Feature(
                     geometry=geojson.Polygon([coordinates]),  # 使用Polygon表示该实例的边界
                     properties={"file_name": os.path.basename(file)}  # 将文件名作为属性

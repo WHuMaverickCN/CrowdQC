@@ -133,6 +133,28 @@ def instance_segmentation_with_cv2(mask, output_path):
     cv2.imwrite(output_path, labels)
     
     return labels, num_labels
+
+def simplify_polygon(points, epsilon=0.01):
+    """
+    使用Ramer-Douglas-Peucker算法简化多边形轮廓。
+
+    :param points: 包含多边形顶点的列表，格式为 [(x1, y1, z1), (x2, y2, z2), ...]
+    :param epsilon: 控制简化程度的参数，越大简化程度越高，保留的点越少
+    :return: 简化后的多边形顶点列表
+    """
+    # 转换点集为适合OpenCV处理的格式
+    contour = np.array(points, dtype=np.float32)[:, :2]  # 仅取前两个坐标 (x, y)
+    
+    # 使用cv2.approxPolyDP进行简化
+    epsilon = epsilon * cv2.arcLength(contour, True)
+    simplified_contour = cv2.approxPolyDP(contour, epsilon, True)
+    
+    hull = cv2.convexHull(simplified_contour)
+    # 将简化后的轮廓点转换回原始格式 (x, y, z)，并保留 z 轴信息
+    simplified_points = [(np.float64(point[0][0]), np.float64(point[0][1])) for point in hull]
+    # simplified_points = np.array([(point[0][0], point[0][1]) for point in simplified_contour], dtype=np.float64)
+   
+    return simplified_points
 def segment_mask_to_utilized_field_mask(semantic_mask, fixed_param):
     """
     将实例分割的mask图层转化为利用过的区域掩码
@@ -157,6 +179,8 @@ def segment_mask_to_utilized_field_mask(semantic_mask, fixed_param):
     # instance_mask是实例分割之后的结果，像素值为0、1、2、3、4、5、6、7、8、9... 具体数值取决于实例数
     # simplify_edges_mask = simplify_lane_edges(umask)
     # simplify_edges_mask_from_instance = simplify_lane_edges(instance_mask)
+
+    # simplify_edges_points = extract_lane_edges(edges_mask)
     simplify_edges_points = simplify_lane_edges(edges_mask)
     # save_simplified_points_image(simplify_edges_points, edges_mask.shape, 'simpled_mask.png')
     _,instance_edge_points_list = match_simplified_points_to_instances(instance_mask,simplify_edges_points)
@@ -227,6 +251,24 @@ def simplify_lane_edges(mask, epsilon=5.0):
         
         # 将简化后的点集转换为(x, y)格式
         points = [(point[0][0], point[0][1]) for point in approx_curve]
+        simplified_lane_points.append(points)
+    
+    return simplified_lane_points
+
+def extract_lane_edges(mask,epsilon_ratio=0.001):
+    # 寻找车道线边缘轮廓
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    # 存储所有车道线实例的简化点集
+    simplified_lane_points = []
+
+    for contour in contours:
+        # 使用Ramer-Douglas-Peucker算法对轮廓点进行简化
+        # epsilon = epsilon_ratio * cv2.arcLength(contour, True)
+        # approx_curve = cv2.approxPolyDP(contour, epsilon, True)
+        
+        # 将简化后的点集转换为(x, y)格式
+        points = [(point[0][0], point[0][1]) for point in contour]
         simplified_lane_points.append(points)
     
     return simplified_lane_points
