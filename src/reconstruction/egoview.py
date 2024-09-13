@@ -209,10 +209,10 @@ class EgoviewReconstruction:
 
         # 计算比例因子，假设平面高度Z=0,即每个像素换算为世界坐标系对应的距离，以米为单位
         # 这里，直接利用外参进行变换之前计算比例因子是关键步骤
-        # scale_factor = vehicle_height / (R[2, 0] * normalized_camera_coords[0] + 
-        #                                 R[2, 1] * normalized_camera_coords[1] + 
-        #                                 R[2, 2])
-        scale_factor = vehicle_height / np.dot(R[2], normalized_camera_coords)
+        scale_factor = vehicle_height / (R[2, 0] * normalized_camera_coords[0] + 
+                                        R[2, 1] * normalized_camera_coords[1] + 
+                                        R[2, 2])
+        # scale_factor = vehicle_height / np.dot(R[2], normalized_camera_coords)
 
         # 乘以比例因子得到相机坐标系中的点
         camera_coords_scaled = normalized_camera_coords * scale_factor
@@ -290,13 +290,19 @@ class EgoviewReconstruction:
         loc_data_df = input.read_loc_data(_loc_path)
         
         for file in files:
-            q,world_coords_from_ins = get_quaternion_and_coordinates(loc_data_df,file,"pic_0")
-            # print(q,world_coords_from_ins)
-            if q == None and world_coords_from_ins==None:
+            # 从定位数据中获取四方位元素与欧拉角+
+            quat,world_coords_from_ins,rph = get_quaternion_and_coordinates(loc_data_df,
+                                                                            file,
+                                                                            "pic_0")
+            
+            rot_param = [quat,rph]
+            print(rph)
+            if quat == None and world_coords_from_ins==None:
                 continue
             print(file)
             sem_seg = read_segmentation_mask_from_pickle(file)
-            instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,fixed_param)
+            instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,
+                                                                            fixed_param)
             # ins_seg = semantic_to_instance_segmentation(sem_seg)
             # print(instance_edge_points_list)
             
@@ -311,13 +317,16 @@ class EgoviewReconstruction:
                                                                         self.pose_rotation_matrix, 
                                                                         self.pose_transaction_vector, 
                                                                         vehicle_height)
-                    # trans_ego_coord_to
-                    point_world = trans_ego_to_world_coord(point_vehicle, q, world_coords_from_ins)
+                    # 将自车坐标转化为世界坐标
+                    point_world = trans_ego_to_world_coord(point_vehicle = point_vehicle, 
+                                                           quanternion = rot_param, 
+                                                           geographical_coords=world_coords_from_ins)
                     # print(point_world)
                     # q,world_coords_from_ins
                     # coordinates.append((point_vehicle[0], point_vehicle[1],0))  # 添加点坐标到坐标列表中
                     # coordinates.append((point_world[0], point_world[1],0.0))  # 添加点坐标到坐标列表中
                     coordinates.append((point_world[0], point_world[1]))  # 添加点坐标到坐标列表中
+
 
                     # print(
                     #     "point_camera:",\
@@ -326,7 +335,7 @@ class EgoviewReconstruction:
                     #     point_vehicle,"\n",
                     #     "point_world:",\
                     #     point_world)
-                coordinates = simplify_polygon(coordinates)
+                # coordinates = simplify_polygon(coordinates)
                 feature = geojson.Feature(
                     geometry=geojson.Polygon([coordinates]),  # 使用Polygon表示该实例的边界
                     properties={"file_name": os.path.basename(file)}  # 将文件名作为属性
@@ -368,6 +377,14 @@ class EgoviewReconstruction:
         print("世界坐标:", world_point)
 
     def batch_ego_reconstruction(self,target_dir="output"):
+        """
+        批量进行ego数据重建
+        Args:
+            target_dir (str, optional): 目标文件夹路径，默认为"output"。
+
+        Returns:
+            None
+        """
         files = os.listdir(target_dir)
         for file in files:
             print(file)

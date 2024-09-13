@@ -392,6 +392,8 @@ def get_quaternion_and_coordinates(df, pic_value, comparison_field="pic_0"):
     matched_rows = df[df[comparison_field] == file_name]
 
     if not matched_rows.empty:
+        rph = matched_rows[['roll','pitch','heading']].values.tolist()
+
         print(matched_rows['utc'].mean())
         # 获取对应行的 q_w, q_x, q_y, q_z 列
         quaternion_list = matched_rows[['q_x', 'q_y', 'q_z','q_w']].values.tolist()
@@ -412,6 +414,10 @@ def get_quaternion_and_coordinates(df, pic_value, comparison_field="pic_0"):
         avg_longitude = np.mean(longitude, axis=0)
         avg_latitude = np.mean(latitude, axis=0)
 
-        return average_quaternion_list, (avg_longitude, avg_latitude)
+        rph_array = np.array(rph)
+        average_rph = np.mean(rph_array, axis=0)
+        average_rph_list = average_rph.tolist()
+
+        return average_quaternion_list, (avg_longitude, avg_latitude),average_rph_list
     else:
-        return None, None
+        return None, None, None

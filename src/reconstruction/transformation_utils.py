@@ -238,24 +238,36 @@ def trans_ego_to_world_coord(
         point_vehicle:np.ndarray,
         quanternion:list,
         geographical_coords:list,
+        mode:str= "quat"
     )->np.ndarray:
     '''
     # 将车端x,y,z坐标转化为世界坐标
     # 输入一个点，输出一个点
     # 此处输入的四元数为长安汽车官方ins数据中解析得到，通常每一帧均需要读取一个四元数
     # 输入quanterion为[x,y,z,w]形式的列表
-    '''
 
-    rot = sciR.from_quat(quanternion)
+    如果 mode = "quat",则输入的quanternion为[x,y,z,w]形式的列表
+    如果 mode = "euler",则读取旋转信息的为[x,y,z]形式的列表
+    '''
+    if mode == "quat":
+        quat = quanternion[0]
+        rot = sciR.from_quat(quat)
+    elif mode == "euler":
+        euler = quanternion[1]
+        rot = sciR.from_euler('xyz',euler,degrees = True)
+    else:
+        return
+    
     # print(rot.as_euler('xyz', degrees=True))
     # return 
+
+    # 下面一套过程是根据四元数（quat）进行计算的，将自车坐标系下的点转换到世界坐标系下
     rot_matrix = rot.as_matrix()
-
     rot_matrix_inv = np.linalg.inv(rot_matrix)
+    # rot_matrix_inv = rot_matrix
     point_world = np.dot(rot_matrix_inv, point_vehicle)
-
     utm_point_x,utm_point_y = from_raw_point_world_to_utm(point_world[0],point_world[1])
-
+ 
     # 即x表示东方向，y表示北方向
     ins_x,ins_y = from_wgs84_to_target_proj(geographical_coords[1],geographical_coords[0])
 

@@ -30,7 +30,7 @@ if __name__ == "__main__":
     reconstruction = EgoviewReconstruction()
     reconstruction.batch_ego_reconstruction(target_recons_dir)
 
-    #根据目标车端矢量数据查询当前数据的配到多源数据并打包
+    # 根据目标车端矢量数据查询当前数据的配到多源数据并打包
     import os
     target_path = r"E:\caq_data\dataset\features\l35\2023-07-27\LS6A2E161NA505442_L35\VecPE"
     file_list = os.listdir(target_path)
