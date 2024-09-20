@@ -46,11 +46,13 @@ if __name__ == "__main__":
     #                                         target_folder = 'output')
     _count = 0
     for target_vec_slice in file_list:
+        _count = _count + 1
         print(f"scan:{_count} / {len(file_list)}")
+        if _count<6444:
+            continue
         if target_vec_slice.endswith(".geojson"):
             pipeline = PositionErrorPredictPipeline(vec_path = target_vec_slice,
                                             config_file = "config.ini",
                                             id = True,
                                             target_folder = 'output')
             
-        _count = _count + 1

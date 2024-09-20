@@ -1,10 +1,15 @@
 import cv2
+import json
+import geojson
 import numpy as np
+from pathlib import Path
 import pandas as pd
 from pyproj import Transformer
 from scipy.spatial.transform import Rotation as sciR
 np.set_printoptions(precision=6, suppress=True)
 from math import pi
+
+from ..io import input
 
 _lon = 106.4417403
 _lat = 29.49942031
@@ -304,6 +309,66 @@ def trans_instance_to_shape():
 # trans_ego_to_world_coord((0,0,0))
 
 def match_trajectory_to_insdata(trajectory:str,
-                                ins_data:pd.DataFrame):
-    pass
+                                ins_data_file:pd.DataFrame):
+    print(trajectory)
+    print(ins_data_file)
+    _loc_path = str(Path(ins_data_file).absolute())
+    loc_data_df = input.read_loc_data(_loc_path)
+    # traj = json.loads(input.read_vec_data(trajectory))
+
+    with open(trajectory, 'r') as fp:
+        _traj = geojson.load(fp)
+    
+    # 解析 B 数据中的点
+    B_data = []
+    for feature in _traj["features"]:
+        if feature["geometry"]["type"] == "Point":
+            B_data.append(feature["geometry"]["coordinates"][:2])
+            # print(feature["geometry"]["coordinates"])
+            # B_data = feature["geometry"]["coordinates"]
+    # 将 B 数据转换为 DataFrame
+    B_data = pd.DataFrame(B_data, columns=['longitude', 'latitude'])
+    A_data = loc_data_df[["sec_of_week","utc","new_latitude", "new_longitude"]]
+
+    # 确定 A 数据长度和 B 数据长度
+    A_len = len(A_data)
+    B_len = len(B_data)
+
+    points_per_segment = A_len / (B_len - 1)
+
+    A_data_corrected = A_data.copy()
+
+    def linear_interpolation(p1, p2, t):
+        """ 计算 p1 和 p2 之间的插值点，t 为比例系数（0 <= t <= 1） """
+        lat = (1 - t) * p1[1] + t * p2[1]
+        lon = (1 - t) * p1[0] + t * p2[0]
+        return lat, lon
+    for i in range(A_len):
+    # 找到 A 中的点位于 B 中的哪个线段
+        segment_index = int(i // points_per_segment)
+        
+        if segment_index >= B_len - 1:
+            # 确保 index 不超出 B 的范围
+            segment_index = B_len - 2
+        
+        # 确定 A 点在 B 中对应的两点 B[segment_index] 和 B[segment_index + 1]
+        B_start = B_data.loc[segment_index]
+        B_end = B_data.loc[segment_index + 1]
+        
+        # 计算当前 A 点在该段上的插值比例 t
+        t = (i % points_per_segment) / points_per_segment
+        
+        # 计算插值后的坐标
+        new_lat, new_lon = linear_interpolation((B_start['longitude'], B_start['latitude']),
+                                                (B_end['longitude'], B_end['latitude']),
+                                                t)
+        
+        # 更新 A 中的点
+        A_data_corrected.loc[i, 'latitude'] = new_lat
+        A_data_corrected.loc[i, 'longitude'] = new_lon
+
+    # 输出修正后的 A 数据
+    return A_data_corrected
+    print(A_data_corrected)
+    print(loc_data_df)
     # 将ins_data匹配到traj_data，构建点到点的映射关系

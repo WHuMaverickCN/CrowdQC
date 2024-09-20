@@ -4,6 +4,7 @@ import geojson
 import numpy as np
 from pathlib import Path
 from math import pi
+from scipy.spatial.distance import euclidean
 import glob
 
 from src.reconstruction.vanishing_point_utils import get_vanishing_point
@@ -250,13 +251,12 @@ class EgoviewReconstruction:
 
         return point_camera,point_vehicle
     
-    
-
     def transation_instance(self,
                             DEFAULT_MASK_FILE_PATH,
                             DEFAULT_PROCESSED_DAT_LOC_PATH,
+                            traj_correction_dict,
                             output_file_name,
-                            default_output_path = "reconstruction_output/"):
+                            default_output_path = "reconstruction_output_0919/"):
         # Example usage
         # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
         camera_matrix = self.K_cam0
@@ -290,7 +290,7 @@ class EgoviewReconstruction:
         loc_data_df = input.read_loc_data(_loc_path)
         
         for file in files:
-            # 从定位数据中获取四方位元素与欧拉角+
+            # 从定位数据中获取四元数、世界坐标、欧拉角
             quat,world_coords_from_ins,rph = get_quaternion_and_coordinates(loc_data_df,
                                                                             file,
                                                                             "pic_0")
@@ -300,6 +300,34 @@ class EgoviewReconstruction:
             if quat == None and world_coords_from_ins==None:
                 continue
             print(file)
+            def find_closest_point(target_point, dataframe):
+                """
+                找到与目标点距离最近的DataFrame中的点。
+
+                参数:
+                target_point : tuple
+                    目标点的经纬度 (latitude, longitude)。
+                dataframe : pd.DataFrame
+                    包含经纬度数据的DataFrame。
+
+                返回:
+                pd.Series
+                    距离目标点最近的DataFrame中的行。
+                """
+                # 计算目标点与DataFrame中每个点的欧几里得距离
+                distances = dataframe.apply(lambda row: euclidean((row['new_longitude'], row['new_latitude']), target_point), axis=1)
+                
+                # 找到距离最近的点的索引
+                closest_index = distances.idxmin()
+                
+                # 返回距离最近的那行数据
+                return dataframe.loc[closest_index]
+            
+            closest_point = find_closest_point(world_coords_from_ins, traj_correction_dict)
+            # print(closest_point)
+            # print(world_coords_from_ins)
+            world_coords_from_ins=(closest_point.iloc[5],closest_point.iloc[4])
+            # print(world_coords_from_ins)
             sem_seg = read_segmentation_mask_from_pickle(file)
             instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,
                                                                             fixed_param)
@@ -391,9 +419,18 @@ class EgoviewReconstruction:
             temp_data_root = os.path.join(target_dir, file)
             temp_mask_path = os.path.join(temp_data_root, "array_mask")
             temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
+            
+            temp_traj_file = glob.glob(os.path.join(temp_data_root, "trajectory*"))
+            if len(temp_traj_file) > 0:
+                temp_traj_file = temp_traj_file[0]
+            else:
+                temp_traj_file = ''
+
+            traj_correction_dict = match_trajectory_to_insdata(temp_traj_file,temp_loc_file)
             self.transation_instance(
-                DEFAULT_MASK_FILE_PATH=temp_mask_path,
-                DEFAULT_PROCESSED_DAT_LOC_PATH=temp_loc_file,
+                DEFAULT_MASK_FILE_PATH = temp_mask_path,
+                DEFAULT_PROCESSED_DAT_LOC_PATH = temp_loc_file,
+                traj_correction_dict = traj_correction_dict,
                 output_file_name=file
             )
     def inverse_perspective_mapping(self, undistorted_img):

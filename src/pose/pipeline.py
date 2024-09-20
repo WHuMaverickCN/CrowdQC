@@ -55,17 +55,17 @@ class PositionErrorPredictPipeline():
 
         target_loc_data_package,package_names = DataSearcher.get_raw_data_package(self.location_file_path,_gf_start_time,_gf_end_time)
         if target_loc_data_package == -1 and package_names == -1:
-            # print(f"skip:{self.vec_path}")
+            print(f"skip:{self.vec_path}")
             logger.info(f"skip:{self.vec_path}")
             return
         for package_name in package_names:
             target_vis_data_package = DataSearcher.get_target_shape_data_path(self.vision_file_path, package_name)
         
         if len(target_loc_data_package)==0 or len(target_vis_data_package)==0:
-            # print(f"skip:{self.vec_path}")
+            print(f"skip:{self.vec_path}")
             logger.info(f"skip:{self.vec_path}")
             return
-        # 封装文件路径为DataSamplePathWrapper对象
+        # 打包文件路径为DataSamplePathWrapper对象
         if len(full_traj_path_list) >= 1 and len(full_vec_path_list) >= 1:
             full_traj_path = full_traj_path_list[0]
             full_vec_path = full_vec_path_list[0]
