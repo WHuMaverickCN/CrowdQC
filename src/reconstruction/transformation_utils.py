@@ -7,7 +7,8 @@ import pandas as pd
 from pyproj import Transformer
 from scipy.spatial.transform import Rotation as sciR
 np.set_printoptions(precision=6, suppress=True)
-from math import pi
+from math import pi, \
+                radians, cos, sin, asin, sqrt
 
 from ..io import input
 
@@ -372,3 +373,39 @@ def match_trajectory_to_insdata(trajectory:str,
     print(A_data_corrected)
     print(loc_data_df)
     # 将ins_data匹配到traj_data，构建点到点的映射关系
+
+def calculate_average_movement(df,uuid):
+    # 计算每个点的移动向量
+    df['delta_latitude'] = df['new_latitude'] - df['latitude']
+    df['delta_longitude'] = df['new_longitude'] - df['longitude']
+    
+    # 计算每个点的移动角度（以度为单位）
+    df['angle'] = np.arctan2(df['delta_longitude'], df['delta_latitude']) * (180 / np.pi)
+    df['distance'] = df.apply(lambda row: haversine(row['longitude'], row['latitude'], row['new_longitude'], row['new_latitude']), axis=1)
+    mean_angle = np.mean(df['angle'])
+    
+    # 计算所有点移动的平均值
+    mean_movement = df['distance'].mean()
+    # 将结果转换为JSON格式
+    results = {
+        'average_direction': mean_angle,
+        'average_movement': mean_movement,
+        'current_slice_uuid': uuid
+    }
+    
+    return results
+
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    计算两点之间的地表距离（单位：米）。
+    """
+    # 将十进制度数转化为弧度
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # Haversine公式
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a)) 
+    r = 6371000  # 地球平均半径，单位为米
+    return c * r

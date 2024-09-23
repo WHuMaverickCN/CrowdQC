@@ -10,7 +10,8 @@ try:
 except:
     sys.exit('ERROR: 未找到 GDAL/OGR modules')
 
-from .match_utils import get_featurecollection_extent,get_geojson_item_from_ogr_datasource
+from .match_utils import get_featurecollection_extent,\
+    get_geojson_item_from_ogr_datasource
 
 '''
 此函数是使用gdal读取长安提供的真值地图要素

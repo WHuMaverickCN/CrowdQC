@@ -1,6 +1,5 @@
 import os
 import cv2
-import geojson
 import numpy as np
 from pathlib import Path
 from math import pi
@@ -14,6 +13,7 @@ from .TransformGround2Image import TransformGround2Image
 from .TransformImage2Ground import TransformImage2Ground
 
 from ..io import input
+from ..io.output import write_reconstructed_result
 
 np.set_printoptions(precision=6, suppress=True)
 
@@ -259,7 +259,7 @@ class EgoviewReconstruction:
                             DEFAULT_PROCESSED_DAT_LOC_PATH,
                             traj_correction_dict,
                             output_file_name,
-                            default_output_path = "reconstruction_output_0919/"):
+                            default_output_path = "reconstruction_output_0923/"):
         # Example usage
         # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
         camera_matrix = self.K_cam0
@@ -299,7 +299,7 @@ class EgoviewReconstruction:
                                                                             "pic_0")
             
             rot_param = [quat,rph]
-            print(rph)
+            print("rph:",rph)
             if quat == None and world_coords_from_ins==None:
                 continue
             print(file)
@@ -375,10 +375,17 @@ class EgoviewReconstruction:
         feature_collection = geojson.FeatureCollection(features)
         if os.path.exists(default_output_path)==False:
             os.mkdir(default_output_path)
-        with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
-            geojson.dump(feature_collection, f)
-            # with open('intent_output_world_065.geojson', 'w') as f:
-            #     geojson.dump(feature_collection, f)   
+
+        _log = calculate_average_movement(df=traj_correction_dict,
+                                   uuid=output_file_name)
+        # 将重建结果写入文件
+        write_reconstructed_result(default_output_path,
+                        output_file_name,
+                        feature_collection,
+                        recons_log = _log)
+        # with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
+        #     geojson.dump(feature_collection, f)
+  
         return
         # 示例使用，输入参数需根据实际摄像机参数调整
         from .transformation_utils import SAMPLE_POINTS_IN_PIXEL as samples

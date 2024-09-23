@@ -1,6 +1,25 @@
 import pandas as pd
 import shutil
+import geojson
 import os
+
+def write_reconstructed_result(default_output_path,
+                        output_file_name,
+                        feature_collection,
+                        recons_log):
+    """
+    Write a dataframe to csv file.
+    :param df: Dataframe
+    :type df: pandas.DataFrame
+    :param path: Path of the output file
+    :type path: str
+    """
+    with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
+        geojson.dump(feature_collection, f)
+    
+    with open(os.path.join(default_output_path, output_file_name+"recons_log.json"), 'w') as f:
+        geojson.dump(recons_log, f)
+    
 def wirte_cluster_to_csv(path):
     """
     Write a dataframe to csv file.

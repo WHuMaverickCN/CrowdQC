@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
-    from src.evaluation import validate
+    # from src.evaluation import validate
 
     # 使用示例
     '''

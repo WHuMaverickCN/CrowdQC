@@ -1,5 +1,5 @@
 git add .
-git commit -m "valid0.1"
+git commit -m "add trajectory bias in reconstruction log"
 git push -u origin_caq main
 #   temp
 

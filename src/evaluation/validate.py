@@ -90,7 +90,11 @@ HighDefinitionMapTileNameList = [
 GROUND_TRUTH_FEATURE_TILED_PATH = 'F:\\caq\\root_bak\\data\\_no_bias_ground_truth\\groundtruth'
 
 class positionAccuracyAssessor:
-    def __init__(self):
+    def __init__(self,
+                 vec_path="",
+                 config_file="config.ini",
+                 id = True,
+                 target_folder = 'output'):
         print("Assessor : positionAccuracyAssessor - 位置准确度比较类")
         # self.case = case_name
     
