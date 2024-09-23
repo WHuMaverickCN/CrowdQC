@@ -229,7 +229,10 @@ class EgoviewReconstruction:
     def image_to_vehicle(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height):
         # 去畸变像素点（如果使用的是畸变图像点）
         uv = np.array([[[u, v]]], dtype=np.float32)
-        uv_undistorted = cv2.undistortPoints(uv, camera_matrix, dist_coeffs, P=camera_matrix)
+        uv_undistorted = cv2.undistortPoints(uv, 
+                                             camera_matrix, 
+                                             dist_coeffs, 
+                                             P=camera_matrix)
         undistorted_points = cv2.undistortPoints(uv, camera_matrix, dist_coeffs,P=camera_matrix)
 
         # 将像素坐标转换为归一化相机坐标

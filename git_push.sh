@@ -1,4 +1,7 @@
 git add .
-git commit -m "基于优化位姿进行重建"
+git commit -m "valid0.1"
 git push -u origin_caq main
-#temp
+#   temp
+
+#   git rm temp_folder -r
+#   更新gitclone

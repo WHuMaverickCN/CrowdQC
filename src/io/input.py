@@ -5,6 +5,43 @@ import geopandas as gpd
 import pandas as pd
 import pickle
 
+def _m_read_data_to_ogr_datasource_batch(data_name):
+    if os.path.isdir(data_name):
+        print("数据读取 - 该要素输入形式为文件夹\n")
+    feature_data_source_dict = {}
+    _slice_list = os.listdir(data_name)
+
+    for _slice in _slice_list:
+        _key = _slice.split('.')[0]
+        _slice_full_path = os.path.join(data_name,_slice)
+        feature_data_source = _m_read_data_to_ogr_datasource(_slice_full_path)
+        feature_data_source_dict[_key] = feature_data_source
+        print("车端数据slice数量：",len(feature_data_source_dict),'/',len(_slice_list),end = '\r')
+    return feature_data_source_dict
+
+# 原始caq_utd工程中使用数据的方式
+def _m_read_data_to_ogr_datasource(data_name):
+    #首先判断dataname是否包含路径
+    folder_name,file_name= os.path.split(data_name)
+    file_name,file_ext = os.path.splitext(file_name)
+
+    with open(data_name,'r',encoding='utf-8') as fp:
+        _content = fp.read()
+        # _feature_data_source = read_geojson(_content)
+        _feature_data_source = ogr.Open(_content)
+        if _feature_data_source is None:
+            print(f"无法打开文件：{_content}")
+            return None
+        else:
+            total_count = 0
+            _lyr_count = _feature_data_source.GetLayerCount()
+            for i in range(_lyr_count):
+                _feat_num = _feature_data_source[i].GetFeatureCount()
+                total_count += _feat_num
+            if total_count == 0:
+                return None
+            return _feature_data_source
+
 def read_loc_data(path):
     df = pd.read_csv(path)    
     return df

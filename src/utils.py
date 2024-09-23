@@ -1,6 +1,7 @@
 import re
 import os
 import uuid
+import time
 import math
 import datetime
 from dataclasses import dataclass
@@ -563,3 +564,14 @@ class VehicleDataset:
     def __init__(self,vec_full_path,traj_full_path):
         self.vec_root = os.path.split(vec_full_path[0])[0]
         self.traj_root = os.path.split(traj_full_path[0])[0]
+
+def print_run_time(description):
+    def wrapper(func):
+        def inner(*args,**kwargs):
+            start = time.time()
+            res = func(*args,**kwargs)
+            end = time.time()
+            print(f'{description}运行耗时: {end - start} 秒')
+            return res
+        return inner
+    return wrapper

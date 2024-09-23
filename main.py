@@ -16,6 +16,8 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
+    from src.evaluation import validate
+
     # 使用示例
     '''
     # 使用1: 直接对图像进行逆透视变换读取参数
