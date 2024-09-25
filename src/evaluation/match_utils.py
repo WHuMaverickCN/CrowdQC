@@ -1,5 +1,6 @@
 import json
 import sys
+import geopandas as gpd
 from shapely.geometry import shape
 try:
     from osgeo import ogr,osr
@@ -45,7 +46,6 @@ def transform_coordinates(input_ds, target_epsg):
                 else:
                     new_feature.SetField(field, _field)
 
-
             output_layer.CreateFeature(new_feature)
 
     return output_ds
@@ -58,6 +58,28 @@ def get_geojson_item_from_ogr_datasource(hd_item):
     # return geojson_data['features']['geometry']
     return geojson_data
     
+def get_recons_feature_extent(_fc):
+    """
+    计算给定GeoJSON文件的边界框（Extent）。
+    
+    参数:
+    geojson_path (str): GeoJSON文件的路径。
+    
+    返回:
+    tuple: 一个包含四个元素的元组 (minx, miny, maxx, maxy)。
+    """
+    # pass
+    try:
+        gdf = gpd.read_file(_fc)
+        gdf = gdf.set_crs(epsg=32648, allow_override=True)
+
+        gdf_4326 = gdf.to_crs("EPSG:4326")
+        # 获取边界框
+        extent = gdf_4326.total_bounds
+        return extent
+    except Exception as e:
+        print(f"Error calculating extent: {e}")
+        return None
 def get_featurecollection_extent(_fc):
     '''
     读取featurecollection，循环内部每个geometry，计算最大extent

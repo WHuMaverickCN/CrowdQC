@@ -12,6 +12,7 @@ from shapely.geometry import shape,box
 from shapely import from_geojson
 
 from .match_utils import get_featurecollection_extent,\
+    get_recons_feature_extent,\
     transform_coordinates
 
 from .hdmap_item import *
@@ -126,7 +127,8 @@ class positionAccuracyAssessor:
     def batch_compare(self,
                       target_path=".",
                       target_feature_type_list = Target_HighDefinitionMapItemName,
-                      if_index = False):
+                      if_index = False,
+                      target_type = 'slice'):
         '''
         # 此处的batch_compare函数用于批量比较目标路径下的所有slice或三角化重建结果与真值tile之间的位置误差，并将结果写入到semantic_slice_to_ground_truth.pkl文件
         # 支持两种输入，即target_path为slice的路径，或者target_path为三角化重建结果的路径
@@ -134,7 +136,11 @@ class positionAccuracyAssessor:
         
         # 获取slice和真值tile的映射关系，建立初步的粗索引
         if if_index == False:
-            _slice_to_gt_tile = self.__match_current_feature_to_ground_truth(target_path)
+            if target_type == 'slice':
+                _slice_to_gt_tile = self.__match_current_feature_to_ground_truth(target_path)
+            elif target_type == 'recons':
+                _slice_to_gt_tile = self.__match_current_feature_to_ground_truth(target_path,
+                                                                             mode='recons')
         else:
             _slice_to_gt_tile = input.read_semantic_slice_to_ground_truth_dict('semantic_slice_to_ground_truth.pkl')
 
@@ -174,11 +180,18 @@ class positionAccuracyAssessor:
                 if reference_pack!={} and target_item.data!=None:
                     _positional_error_in_current_slice  = self.compare_vec2gt(target_item,
                                                                             reference_pack,
-                                                                            index_project)
-
-                    # self.__write_positional_error_to_all_sementic_file(_item_key,
-                    #                                                 _positional_error_in_current_slice)
-                
+                                                                            index_project,
+                                                                            mode=target_type)
+                    # if target_type == 'slice':
+                    #     _positional_error_in_current_slice  = self.compare_vec2gt(target_item,
+                    #                                                         reference_pack,
+                    #                                                         index_project)
+                    # elif target_type == 'recons':
+                    #     _positional_error_in_current_slice  = self.compare_vec2gt(target_item,
+                    #                                                         reference_pack,
+                    #                                                         index_project,
+                    #                                                         mode=target_type)
+                    
                 else:
                     #如果reference_item_list为空，表示当前车端数据没有对应真值
                     _positional_error_in_current_slice = 'No_reference_ground_truth'
@@ -189,7 +202,7 @@ class positionAccuracyAssessor:
                                                                                 reference_pack,                                                                               )
         return
 
-    def __(self,target_path,positional_error_array) -> bool:
+    def write_positional_error_to_all_sementic_file(self,target_path,positional_error_array) -> bool:
         '''
         此函数将每个slice的绝对位置误差赋值到semantic中
         '''
@@ -327,10 +340,9 @@ class positionAccuracyAssessor:
     @staticmethod
     def find_nearest_feature(_trans_target_slice, 
                              trans_reference_geometry_list, 
-                             field_name1="oid", 
-                             field_time1="start_time", 
                              min_area=20,
-                             index_project = {}):
+                             index_project = {},
+                             mode="slice"):
         """
         寻找给定要素最近的要素。
 
@@ -346,8 +358,12 @@ class positionAccuracyAssessor:
             for feature1 in layer1:
                 # 遍历第一个图层的各个要素
                 geometry1 = feature1.GetGeometryRef()
-                name1 = feature1.GetField(field_name1)
-                ts = feature1.GetField(field_time1)
+                if mode == 'recons':
+                    name1 = feature1.GetField("cluster_id")
+                    ts = 'temp'
+                elif mode=='slice':
+                    name1 = feature1.GetField("oid")
+                    ts = feature1.GetField("start_time")
 
                 nearest_distance = float("inf")
                 nearest_name = ""
@@ -403,7 +419,8 @@ class positionAccuracyAssessor:
     def compare_vec2gt(self, 
                     target_item, 
                     reference_items,
-                    index_project):
+                    index_project,
+                    mode='slice'):
         ''' 
         本函数计算一个slice内部的所有向量之间的
         此函数输入为本工程定义的类 hd_item1，hd_item2中的data数据为gdal的DataSource对象
@@ -424,7 +441,11 @@ class positionAccuracyAssessor:
 
         '''
         _trans_reference_geometry_list =[]
-        _trans_target_slice = transform_coordinates(target_item.data, 32648)
+        if mode=='slice':
+            _trans_target_slice = transform_coordinates(target_item.data, 32648)
+        elif mode=='recons':
+            _trans_target_slice = target_item.data
+
         #转换target数据到utm坐标系
         if reference_items !='index_build':
             for reference_tile_id,reference_item in reference_items.items():
@@ -434,59 +455,18 @@ class positionAccuracyAssessor:
                     _trans_reference_geometry_list.append(_trans_reference_geometry)
                     absolute_positional_error = positionAccuracyAssessor.find_nearest_feature(_trans_target_slice, 
                                                                                 _trans_reference_geometry_list, 
-                                                                                min_area=20) #面积特别大的要素直接跳过
+                                                                                min_area=20,
+                                                                                mode=mode) #面积特别大的要素直接跳过
         else:
             # 此时已经建立了索引
             absolute_positional_error = positionAccuracyAssessor.find_nearest_feature(_trans_target_slice, 
                                                                                 _trans_reference_geometry_list, 
                                                                                 min_area=20,
-                                                                                index_project=index_project) 
-        
+                                                                                index_project=index_project,
+                                                                                mode=mode) 
                              
         return absolute_positional_error
-        # for layer1 in _trans_target_slice:
-        # # 遍历车端矢量中的各个图层
-        #     for feature1 in layer1:
-        #         # 遍历车图层的各个要素
-
-        #         geometry1 = feature1.GetGeometryRef()
-        #         # 获取要素的几何图形
-        #         name1 = feature1.GetField("oid")
-
-        #         ts = feature1.GetField("start_time")
-
-        #         nearest_distance = float("inf")
-        #         nearest_name = ""
-        #         for _trans_reference_geometry in _trans_reference_geometry_list:
-        #             for layer2 in _trans_reference_geometry:
-        #                 for feature2 in layer2:
-        #                     geometry2 = feature2.GetGeometryRef()
-        #                     if geometry2.GetArea()>20:
-        #                     #此时为较大的道路停止线等要素，通常位于路口，此时应当跳过
-        #                         continue
-        #                     name2 = feature2.GetField("id")
-        #                     # if name2 == '9547631416740050278' or name2 == '9583660961083323750':
-        #                     #     print("target")
-        #                     '''
-        #                     此处计算两个要素的绝对位置误差
-        #                     '''
-        #                     # #1 最短距离
-        #                     distance = geometry1.Distance(geometry2) 
-        #                     # #2 hausdorff_distance距离
-        #                     # distance = shapely.hausdorff_distance(self.ogr_geometry_to_shapely_linestring(geometry1), self.ogr_geometry_to_shapely_linestring(geometry2))
-        #                     # distance = shapely.hausdorff_distance(self.ogr_geometry_to_shapely_new(geometry1), self.ogr_geometry_to_shapely_new(geometry2))
-                            
-        #                     # distance = shapely.hausdorff_distance(geometry1, geometry2)
-        #                     #3 frechet_distance距离
-        #                     # distance = shapely.frechet_distance(geometry1, geometry2)
-        #                     if distance < nearest_distance:# and self.are_features_parallel(geometry1,geometry2):
-        #                         nearest_distance = distance
-        #                         nearest_name = name2
-                                
-        #                         # absolute_positional_error.append(nearest_distance)
-        #         print(f"--Feature '{name1}' in {ts} is closest to '{nearest_name}' in gt with distance {nearest_distance}",end = "\r")
-        #         absolute_positional_error = np.append(absolute_positional_error,nearest_distance)
-        # return absolute_positional_error
+    
     def __match_current_feature_to_ground_truth_all(self,
                                                     target_geojson_path)->dict:
         original_path = self.gt_feature_path
@@ -494,8 +474,12 @@ class positionAccuracyAssessor:
         for vec_item in os.listdir(target_geojson_path):
             _dict_semantic_slice_to_ground_truth[vec_item] = HighDefinitionMapTileNameList
         return _dict_semantic_slice_to_ground_truth
+    
+
+
     def __match_current_feature_to_ground_truth(self,
-                                                target_geojson_path)->dict:
+                                                target_geojson_path,
+                                                mode = 'vehicle_slice')->dict:
         '''
         本函数实现的功能为：输入任何一个车端矢量要素，判断其类型，首先获取其最近的tile_id,
         Parameters
@@ -521,7 +505,13 @@ class positionAccuracyAssessor:
 
         _dict_semantic_slice_to_ground_truth = {}
 
-        pattern = re.compile(r'^\d+_\d+(_PE)?\.geojson$')
+        if mode == 'vehicle_slice':
+            pattern = re.compile(r'^\d+_\d+(_PE)?\.geojson$')
+        elif mode == 'recons':
+            # pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.geojson$')
+            pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_line_fit.geojson$')
+        else:
+            raise ValueError("Invalid mode specified.")
         def find_files_with_pattern(directory):
             matching_files = []
             
@@ -548,8 +538,13 @@ class positionAccuracyAssessor:
             
             # #获取当前帧的extent
             # _current_fc_extent = get_featurecollection_extent(vec_item_full_path)
-            _current_fc_extent = get_featurecollection_extent(vec_item)
-            
+           
+            if mode == 'vehicle_slice':
+                 _current_fc_extent = get_featurecollection_extent(vec_item)
+            elif mode == 'recons':
+                 _current_fc_extent = get_recons_feature_extent(vec_item)
+            else:
+                raise ValueError("Invalid mode specified.")
             #将_current_fc_extent转换为shapely的box类型
             _single_extent_geometry = box(_current_fc_extent[0], _current_fc_extent[1], _current_fc_extent[2], _current_fc_extent[3])
 
@@ -751,6 +746,13 @@ if __name__ == 'src.evaluation.validate':
     PA_Assessor = positionAccuracyAssessor(_file_path)
     PA_Assessor.batch_compare(
         target_path = "./output/"
-        # if_index=True
+        # if_index=True,
+        # target_type ='recons'
         )
+    
+    # PA_Assessor.batch_compare(
+    #     target_path = "./reconstruction_output_0923/",
+    #     # if_index=True,
+    #     target_type ='recons'
+    #     )
  

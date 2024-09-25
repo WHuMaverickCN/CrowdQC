@@ -1,6 +1,6 @@
 git add .
-git commit -m "batch compare slice2gt"
-git push -u origin_caq dev
+git commit -m "batch compare recons to gt"
+# git push -u origin_caq dev
 git push -u origin_caq main
 #   temp
 
