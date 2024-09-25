@@ -1,9 +1,54 @@
 import json
 import sys
+import geopandas as gpd
+from shapely.geometry import shape
 try:
-    from osgeo import ogr, osr, gdal
+    from osgeo import ogr,osr
 except:
     sys.exit('ERROR: 未找到 GDAL/OGR modules')
+
+def transform_coordinates(input_ds, target_epsg):
+    if input_ds == None:
+        return ogr.GetDriverByName("Memory").CreateDataSource("")
+    # 获取输入DataSource中的第一个图层
+    input_layer = input_ds.GetLayerByIndex(0)
+
+    # 创建目标投影坐标系
+    target_srs = osr.SpatialReference()
+    target_srs.ImportFromEPSG(target_epsg)  # EPSG代码 32648
+
+    # 创建坐标转换对象
+    transform = osr.CoordinateTransformation(input_layer.GetSpatialRef(), target_srs)
+
+    # 创建输出的DataSource对象
+    output_ds = ogr.GetDriverByName("Memory").CreateDataSource("")
+
+    # 创建输出图层，与输入图层具有相同的几何类型和字段定义
+    output_layer = output_ds.CreateLayer(input_layer.GetName(),
+                                          geom_type=input_layer.GetGeomType(),
+                                          srs=target_srs)
+
+    output_layer.CreateFields(input_layer.schema)
+
+    # 遍历输入图层的要素，进行坐标转换并复制属性
+    for feature in input_layer:
+        geometry = feature.GetGeometryRef()
+        if geometry!=None:
+            geometry.Transform(transform)
+
+            new_feature = ogr.Feature(output_layer.GetLayerDefn())
+            new_feature.SetGeometry(geometry)
+
+            for field in feature.keys():
+                _field = feature.GetField(field)
+                if isinstance(feature.GetField(field),list):
+                    new_feature.SetField(field, _field.__str__())
+                else:
+                    new_feature.SetField(field, _field)
+
+            output_layer.CreateFeature(new_feature)
+
+    return output_ds
 
 def get_geojson_item_from_ogr_datasource(hd_item):
     if type(hd_item.data)==ogr.DataSource and hd_item.data.name=='':
@@ -13,6 +58,28 @@ def get_geojson_item_from_ogr_datasource(hd_item):
     # return geojson_data['features']['geometry']
     return geojson_data
     
+def get_recons_feature_extent(_fc):
+    """
+    计算给定GeoJSON文件的边界框（Extent）。
+    
+    参数:
+    geojson_path (str): GeoJSON文件的路径。
+    
+    返回:
+    tuple: 一个包含四个元素的元组 (minx, miny, maxx, maxy)。
+    """
+    # pass
+    try:
+        gdf = gpd.read_file(_fc)
+        gdf = gdf.set_crs(epsg=32648, allow_override=True)
+
+        gdf_4326 = gdf.to_crs("EPSG:4326")
+        # 获取边界框
+        extent = gdf_4326.total_bounds
+        return extent
+    except Exception as e:
+        print(f"Error calculating extent: {e}")
+        return None
 def get_featurecollection_extent(_fc):
     '''
     读取featurecollection，循环内部每个geometry，计算最大extent
