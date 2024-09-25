@@ -2,6 +2,25 @@ import pandas as pd
 import shutil
 import geojson
 import os
+import json
+
+def write_bias_info(target_file_path,
+                    bias_info,
+                    mode):
+    """
+    Write a dataframe to csv file.
+    :param df: Dataframe
+    :type df: pandas.DataFrame
+    :param path: Path of the output file
+    :type path: str
+    """
+    target_dir = os.path.dirname(target_file_path)
+    bias_file_name = mode + '_bias.json'
+    output_json_path = os.path.join(target_dir, bias_file_name)
+    with open(output_json_path, 'w') as json_file:
+        json.dump(bias_info, json_file, indent=4)
+
+    print(f"Dictionary has been written to {output_json_path}")
 
 def write_reconstructed_result(default_output_path,
                         output_file_name,

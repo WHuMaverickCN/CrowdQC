@@ -182,6 +182,12 @@ class positionAccuracyAssessor:
                                                                             reference_pack,
                                                                             index_project,
                                                                             mode=target_type)
+                    
+                    output.write_bias_info(target_file_path,
+                                    bias_info = _positional_error_in_current_slice,
+                                    mode = target_type)
+                    
+
                     # if target_type == 'slice':
                     #     _positional_error_in_current_slice  = self.compare_vec2gt(target_item,
                     #                                                         reference_pack,
@@ -464,7 +470,8 @@ class positionAccuracyAssessor:
                                                                                 min_area=20,
                                                                                 index_project=index_project,
                                                                                 mode=mode) 
-                             
+
+
         return absolute_positional_error
     
     def __match_current_feature_to_ground_truth_all(self,
