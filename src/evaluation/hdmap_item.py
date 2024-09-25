@@ -3,6 +3,7 @@ import json
 import sys
 from ..io import input
 from ..utils import *
+from .match_utils import transform_coordinates
 from shapely.geometry import shape,LineString,Point
 from rtree import index
 try:
@@ -10,13 +11,37 @@ try:
 except:
     sys.exit('ERROR: 未找到 GDAL/OGR modules')
 
-from .match_utils import get_featurecollection_extent,\
+from .match_utils \
+import get_featurecollection_extent,\
     get_geojson_item_from_ogr_datasource
 
 '''
 此函数是使用gdal读取长安提供的真值地图要素
 '''
-class VehiclesData:
+class HdData:
+    data = None
+    def build_si(self):
+        rt_index = index.Index(interleaved=False)
+        utm_trans_data = transform_coordinates(self.data, 32648)
+        for _layer in utm_trans_data:
+            for _feature in _layer:
+                geom = _feature.GetGeometryRef()
+                envelope = geom.GetEnvelope()  # 获取边界框
+                fid = _feature.GetFID()  # 获取feature ID
+                rt_index.insert(fid, envelope)
+        return rt_index
+    
+    def get_items_by_id(self,
+                        feature_ids):
+        # self.data = transform_coordinates(self.data, 32648)
+        items = {}
+        if self.data!=None:
+            for _layer in self.data:
+                for _id in feature_ids:
+                    items[_id] = _layer.GetFeature(_id)
+        return items
+
+class VehiclesData(HdData):
     data = None
     time_slice = 'no-time-slice'
     _rtree_index = None
@@ -30,15 +55,19 @@ class VehiclesData:
         if os.path.isfile(data) and type(time_slice) == str:
             self.data = input._m_read_data_to_ogr_datasource(data)
             self.time_slice = time_slice
-        elif os.path.isdir(data) and time_slice == 'no-time-slice':
-            self.data = input._m_read_data_to_ogr_datasource_batch(data)
-            self.time_slice = time_slice
+        elif os.path.isdir(data):
+            if time_slice == 'no-time-slice':
+                self.data = input._m_read_data_to_ogr_datasource_batch(data)
+                self.time_slice = time_slice
+            else:
+                #此时该文件不存在
+                return
         elif type(data) == ogr.DataSource:
             self.data = data
             self.time_slice = time_slice
     # def read_data(self,data):
     #     self.data = dataload.read_data_with_gdal(data)
-    def build_Rtree_sdb(self,hd_vehicles_data):
+    def __build_Rtree_sdb(self,hd_vehicles_data):
         '''
         此函数对于一个车端数据构建一个Rtree数据库
         '''
@@ -233,8 +262,10 @@ class VehiclesData:
                     '''
                     # overall_direction = measurement.calculate_direction(shapely_feature,trajectory_data)
     def _vis_project(self,feature_name, vector_feature, trajectory_line, nearest_point):
+
         import matplotlib.pyplot as plt
         import geopandas as gpd
+
         # 创建 GeoDataFrame 用于可视化
         gdf_vector = gpd.GeoDataFrame(geometry=[vector_feature])
         gdf_trajectory = gpd.GeoDataFrame(geometry=[trajectory_line])
@@ -255,9 +286,15 @@ class VehiclesData:
         # 显示图形
         plt.show()
 
-class HdmapData:
+class HdmapData(HdData):
     ''' 
     待填充 
     '''
-    def __init__(self,data,dataForm = '高精地图真值'):
+    def __init__(self,data,
+                 dataForm = '高精地图真值',
+                 crf = 'wgs84',
+                 target_crf = 'utm111'):
         self.data = input._m_read_data_to_ogr_datasource(data)
+        if crf == 'wgs84' and target_crf == 'utm111':
+            self.data = transform_coordinates(self.data, 32648)
+        

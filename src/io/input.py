@@ -4,7 +4,12 @@ import configparser
 import geopandas as gpd
 import pandas as pd
 import pickle
+from osgeo import ogr
 
+def read_semantic_slice_to_ground_truth_dict(_pkl_file_name:str):
+    with open(_pkl_file_name, 'rb') as f:
+        _slice_to_gt_tile = pickle.load(f)
+    return _slice_to_gt_tile
 def _m_read_data_to_ogr_datasource_batch(data_name):
     if os.path.isdir(data_name):
         print("数据读取 - 该要素输入形式为文件夹\n")
@@ -74,6 +79,18 @@ def read_config_file(config_file_path):
     vision_file_path = os.path.join(data_root,vision_file_path_rela)
 
     return [feature_file_path,location_file_path,vision_file_path]
+
+def read_config_file_valid(config_file_path):
+    config = configparser.ConfigParser()
+    config.read(config_file_path,encoding = 'UTF8')
+
+    gt_feature_path = config.get('Paths','GROUND_TRUTH_FEATURE_TILED_PATH')
+    data_root = config.get('Paths','data_root')
+    ground_truth_tile_folder = config.get('Paths','ground_truth_tile_folder')
+    
+    ground_truth_tile_folder_full_path = os.path.join(data_root,ground_truth_tile_folder)
+
+    return [ground_truth_tile_folder_full_path,gt_feature_path]
 
 def read_sample_geojson_file(geojson_path):
     gdf_vec = gpd.read_file(geojson_path)
