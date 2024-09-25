@@ -11,6 +11,7 @@ from .transformation_utils import *
 from .landmark_utils import *
 from .TransformGround2Image import TransformGround2Image
 from .TransformImage2Ground import TransformImage2Ground
+from ..utils import print_run_time
 
 from ..io import input
 from ..io.output import write_reconstructed_result
@@ -254,14 +255,15 @@ class EgoviewReconstruction:
 
         return point_camera,point_vehicle
     
+    @print_run_time('完成1切片的重建')
     def transation_instance(self,
                             DEFAULT_MASK_FILE_PATH,
                             DEFAULT_PROCESSED_DAT_LOC_PATH,
                             traj_correction_dict,
                             output_file_name,
                             default_output_path = "reconstruction_output_0923/"):
-        # Example usage
-        # camera_matrix = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+
+
         camera_matrix = self.K_cam0
         # dist_coeffs = np.zeros(5)  # assuming no distortion
         dist_coeffs = self.dist_coeffs_cam0
@@ -299,10 +301,10 @@ class EgoviewReconstruction:
                                                                             "pic_0")
             
             rot_param = [quat,rph]
-            print("rph:",rph)
+            # print("rph:",rph)
             if quat == None and world_coords_from_ins==None:
                 continue
-            print(file)
+            # print(file)
             def find_closest_point(target_point, dataframe):
                 """
                 找到与目标点距离最近的DataFrame中的点。
@@ -358,7 +360,6 @@ class EgoviewReconstruction:
                     # coordinates.append((point_world[0], point_world[1],0.0))  # 添加点坐标到坐标列表中
                     coordinates.append((point_world[0], point_world[1]))  # 添加点坐标到坐标列表中
 
-
                     # print(
                     #     "point_camera:",\
                     #     point_camera,\
@@ -367,6 +368,7 @@ class EgoviewReconstruction:
                     #     "point_world:",\
                     #     point_world)
                 # coordinates = simplify_polygon(coordinates)
+
                 feature = geojson.Feature(
                     geometry=geojson.Polygon([coordinates]),  # 使用Polygon表示该实例的边界
                     properties={"file_name": os.path.basename(file)}  # 将文件名作为属性
@@ -415,6 +417,8 @@ class EgoviewReconstruction:
         print("世界坐标:", world_point)
 
     def batch_ego_reconstruction(self,target_dir="output"):
+        from concurrent.futures import ProcessPoolExecutor,\
+        ThreadPoolExecutor 
         """
         批量进行ego数据重建
         Args:
@@ -423,6 +427,34 @@ class EgoviewReconstruction:
         Returns:
             None
         """
+        def process_file(file, target_dir):
+            print(file)
+            temp_data_root = os.path.join(target_dir, file)
+            temp_mask_path = os.path.join(temp_data_root, "array_mask")
+            temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
+            
+            temp_traj_file = glob.glob(os.path.join(temp_data_root, "trajectory*"))
+            if len(temp_traj_file) > 0:
+                temp_traj_file = temp_traj_file[0]
+            else:
+                temp_traj_file = ''
+
+            traj_correction_dict = match_trajectory_to_insdata(temp_traj_file, temp_loc_file)
+            
+            self.transation_instance(
+                DEFAULT_MASK_FILE_PATH=temp_mask_path,
+                DEFAULT_PROCESSED_DAT_LOC_PATH=temp_loc_file,
+                traj_correction_dict=traj_correction_dict,
+                output_file_name=file
+            )
+        files = os.listdir(target_dir)
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_file, file, target_dir) for file in files]
+
+        # 等待所有任务完成
+        for future in futures:
+            future.result()
+        '''
         files = os.listdir(target_dir)
         for file in files:
             print(file)
@@ -437,12 +469,14 @@ class EgoviewReconstruction:
                 temp_traj_file = ''
 
             traj_correction_dict = match_trajectory_to_insdata(temp_traj_file,temp_loc_file)
+            
             self.transation_instance(
                 DEFAULT_MASK_FILE_PATH = temp_mask_path,
                 DEFAULT_PROCESSED_DAT_LOC_PATH = temp_loc_file,
                 traj_correction_dict = traj_correction_dict,
                 output_file_name=file
             )
+        '''
     def inverse_perspective_mapping(self, undistorted_img):
         height = int(undistorted_img.shape[0]) # row y
         width = int(undistorted_img.shape[1]) # col x
@@ -546,10 +580,8 @@ class EgoviewReconstruction:
 def read_segmentation_mask_from_pickle(mask_path):
     """
     从pickle文件中读取语义分割的mask图层。
-    
     参数:
         mask_path (str): 语义分割的mask文件路径。
-    
     返回:
         semantic_mask (numpy.ndarray): 语义分割的结果，大小为 (H, W)，
                                        每个像素值表示类别标签。

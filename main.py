@@ -26,14 +26,16 @@ if __name__ == "__main__":
     # 批量进行车道线重建
     reconstruction.inverse_perspective_mapping(undistorted_img)
     '''
-
+    print("批量重建")
     # 使用2: 批量进行车道线重建
-    target_recons_dir = "output"
+    target_recons_dir = "G:\\Detect"
     reconstruction = EgoviewReconstruction()
     reconstruction.batch_ego_reconstruction(target_recons_dir)
 
     # 根据目标车端矢量数据查询当前数据的配到多源数据并打包
+    input("Press Enter to exit")
     import os
+    
     target_path = r"E:\caq_data\dataset\features\l35\2023-07-27\LS6A2E161NA505442_L35\VecPE"
     file_list = os.listdir(target_path)
     # target_vec_slice = "1690181536394800_1690181541927900_PE.geojson"

@@ -394,7 +394,7 @@ def get_quaternion_and_coordinates(df, pic_value, comparison_field="pic_0"):
     if not matched_rows.empty:
         rph = matched_rows[['roll','pitch','heading']].values.tolist()
 
-        print(matched_rows['utc'].mean())
+        print(matched_rows['utc'].mean(),'\r')
         # 获取对应行的 q_w, q_x, q_y, q_z 列
         quaternion_list = matched_rows[['q_x', 'q_y', 'q_z','q_w']].values.tolist()
 

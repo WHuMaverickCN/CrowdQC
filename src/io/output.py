@@ -17,7 +17,7 @@ def write_reconstructed_result(default_output_path,
     with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
         geojson.dump(feature_collection, f)
     
-    with open(os.path.join(default_output_path, output_file_name+"recons_log.json"), 'w') as f:
+    with open(os.path.join(default_output_path, output_file_name+"_recons_log.json"), 'w') as f:
         geojson.dump(recons_log, f)
     
 def wirte_cluster_to_csv(path):
