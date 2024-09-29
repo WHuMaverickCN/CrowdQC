@@ -1,6 +1,6 @@
 # just push branch -main
 git add .
-git commit -m "batch compare recons to gt"
+git commit -m "add eval scripts"
 git push -u origin_caq main
 
 # addtional push dev and merge main to dev

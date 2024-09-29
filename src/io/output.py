@@ -4,6 +4,15 @@ import geojson
 import os
 import json
 
+def write_recons_bias_info(target_file_path,
+                    bias_info,
+                    bias_file_name = 'veh2recons_bias.json'):
+    target_dir = os.path.dirname(target_file_path)
+    output_json_path = os.path.join(target_dir, bias_file_name)
+    with open(output_json_path, 'w') as json_file:
+        json.dump(bias_info, json_file, indent=4)
+    
+
 def write_bias_info(target_file_path,
                     bias_info,
                     mode):

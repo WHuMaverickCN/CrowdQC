@@ -768,15 +768,16 @@ class positionAccuracyAssessor:
 if __name__ == 'src.evaluation.validate':
     _file_path = 'config.ini'
     PA_Assessor = positionAccuracyAssessor(_file_path)
-    PA_Assessor.batch_compare(
-        target_path = r"G:\fit0925"
-        # if_index=True,
-        # target_type ='recons'
-        )
-    
     # PA_Assessor.batch_compare(
-    #     target_path = "./reconstruction_output_0923/",
+    #     # target_path = r".\\output\\"
+    #     target_path = r'.\\reconstruction_output_temp\\'
     #     # if_index=True,
-    #     target_type ='recons'
+    #     # target_type ='recons'
     #     )
- 
+    # input()
+    PA_Assessor.batch_compare(
+        target_path = r'.\\reconstruction_output_temp\\',
+        # if_index=True,
+        target_type ='recons'
+        )
+    input()
