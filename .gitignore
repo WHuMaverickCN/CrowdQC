@@ -8,7 +8,7 @@ reconstruction_output*/
 
 # 屏蔽特定名称
 config.ini
-requirements.txt
+# requirements.txt
 
 # 屏蔽生成的图片
 *.jpg
