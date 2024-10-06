@@ -2,7 +2,8 @@
 # 注意不用搞核心算法以外的冗余逻辑
 from src.pose.pipeline import PositionErrorPredictPipeline
 from src.reconstruction.egoview import EgoviewReconstruction
-
+# from src.io.data_load_utils import *
+from src.models.networks import simple_transformer
 import logging
 
 # 配置日志记录器

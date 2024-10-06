@@ -51,14 +51,6 @@ def transform_geometry(geom: BaseGeometry):
         return Point(transformed_coord)
     else:
         raise TypeError(f"不支持的几何类型: {type(geom)}")
-    
-class SliceMeasure:
-    def __init__(self, name):
-        self.name = name
-
-class GlobalMeasure:
-    def __init__(self, name):
-        self.name = name
 
 @dataclass
 class SliceDataPackage:

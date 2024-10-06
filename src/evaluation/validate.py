@@ -570,7 +570,10 @@ class positionAccuracyAssessor:
             else:
                 raise ValueError("Invalid mode specified.")
             #将_current_fc_extent转换为shapely的box类型
-            _single_extent_geometry = box(_current_fc_extent[0], _current_fc_extent[1], _current_fc_extent[2], _current_fc_extent[3])
+            _single_extent_geometry = box(_current_fc_extent[0], 
+                                          _current_fc_extent[1], 
+                                          _current_fc_extent[2], 
+                                          _current_fc_extent[3])
 
             #使用
             _keys_name_list = list(geojson_data.keys())
@@ -775,9 +778,16 @@ if __name__ == 'src.evaluation.validate':
     #     # target_type ='recons'
     #     )
     # input()
+    # PA_Assessor.batch_compare(
+    #     target_path = r'.\\reconstruction_output_temp\\',
+    #     # if_index=True,
+    #     target_type ='recons'
+    #     )
+
     PA_Assessor.batch_compare(
-        target_path = r'.\\reconstruction_output_temp\\',
+        target_path = '/home/gyx/data/cqc/processed/fit0925',
         # if_index=True,
         target_type ='recons'
         )
-    input()
+    
+    # input()
