@@ -4,6 +4,8 @@ temp_geo/
 temp_image/
 reconstruction_output*/
 .data/
+runs/
+paddle_project/
 
 .vscode/
 
