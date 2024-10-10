@@ -19,6 +19,14 @@ TIME_SPAN_PER_DATA_PACKAGE = 60 #每个数据包（.dat）文件包含的原始�
 TILE_NAME = "505442"
 VEHICLE_TYPE = "C385"
 
+def mkdir_if_missing(directory):
+    if not os.path.exists(directory):
+        try:
+            os.makedirs(directory)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
 @dataclass
 class Period:
     start_time:str

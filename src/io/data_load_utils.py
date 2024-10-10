@@ -11,11 +11,18 @@ from sklearn.model_selection import train_test_split
 import math
 import copy
 from datetime import datetime
+from torchvision import transforms
 # from janome.tokenizer import Tokenizer
 
-if torch.cuda.is_available():
-    device = 'cuda:0'
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-else:
-    device = 'cpu'
-print(f'Running on device: {device}')
+# 此处是专门用于读取训练数据，调用torch中DataLoader的位置。
+class ReconstructionDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset_base_dir):
+        self.dataset_base_dir = dataset_base_dir
+        self.totensor = transforms.ToTensor()
+
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, 
+                    idx):
+        pass
