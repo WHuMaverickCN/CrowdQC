@@ -3,6 +3,7 @@ output/
 temp_geo/
 temp_image/
 reconstruction_output*/
+.data/
 
 .vscode/
 
@@ -13,3 +14,6 @@ config.ini
 # 屏蔽生成的图片
 *.jpg
 *.log
+
+#屏蔽生成的模型
+model_*.pth
