@@ -22,6 +22,8 @@ class HdData:
     data = None
     def build_si(self):
         rt_index = index.Index(interleaved=False)
+        if self.data.GetLayerCount()<1:
+            return rt_index
         utm_trans_data = transform_coordinates(self.data, 32648)
         for _layer in utm_trans_data:
             for _feature in _layer:

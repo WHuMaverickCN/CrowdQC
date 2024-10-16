@@ -145,8 +145,10 @@ class positionAccuracyAssessor:
             _slice_to_gt_tile = input.read_semantic_slice_to_ground_truth_dict('semantic_slice_to_ground_truth.pkl')
 
         index_project = {}
-
+        count = 0
         for _item_key in _slice_to_gt_tile.keys():
+            print(f'{count} / {len(_slice_to_gt_tile)}')
+            count += 1
             # reference_file_path_list = [
             #     r'I:\caq_data\dataset\features\ground_truth\all_truth_trans.geojson'
             # ]
@@ -178,10 +180,12 @@ class positionAccuracyAssessor:
                                                                             if_index_build)
                 
                 if reference_pack!={} and target_item.data!=None:
+                    target_tiles = _slice_to_gt_tile[target_file_path]
                     _positional_error_in_current_slice  = self.compare_vec2gt(target_item,
                                                                             reference_pack,
                                                                             index_project,
-                                                                            mode=target_type)
+                                                                            mode=target_type,
+                                                                            target_tiles=target_tiles)
                     
                     output.write_bias_info(target_file_path,
                                     bias_info = _positional_error_in_current_slice,
@@ -293,6 +297,8 @@ class positionAccuracyAssessor:
 
                         # 某一tile内指定类型的空间索引
                         temp_hd_item = HdmapData(reference_file_path)
+                        if temp_hd_item.data.GetLayerCount()==0:
+                            continue
                         temp_spatial_index = temp_hd_item.build_si()
 
                         temp_ref_item['hd_item'] = temp_hd_item
@@ -348,7 +354,8 @@ class positionAccuracyAssessor:
                              trans_reference_geometry_list, 
                              min_area=20,
                              index_project = {},
-                             mode="slice"):
+                             mode="slice",
+                             target_tiles=[]):
         """
         寻找给定要素最近的要素。
 
@@ -390,9 +397,16 @@ class positionAccuracyAssessor:
                                     nearest_name = name2
                 else:
                     envelope = geometry1.GetEnvelope()  # 获取边界框
-                
+                    selected_index_project = {}
+                    for tile_id in target_tiles:
+                        # index_list.append(index_project[tile_id][])
+                        selected_index_project[tile_id] = index_project[tile_id]
+
+                    
                     #此时直接根据索引进行搜索
-                    for _idx_key,_idx_value in index_project.items():
+                    target_refs = []
+                    for _idx_key,_idx_value in selected_index_project.items():
+                    # for _idx_value in index_list:
                         for _hd_item_type_key,_hd_value in _idx_value.items():
                             for _key,_value_geomnindex in _hd_value.items():
                                 if _key == 'spatial_index':
@@ -417,7 +431,7 @@ class positionAccuracyAssessor:
                                                 name2 = feature2.GetField("id")
                                                 nearest_distance = distance
                                                 nearest_name = name2
-                    # print("ok")
+
                 print(f"--Feature '{name1}' in {ts} is closest to '{nearest_name}' in gt with distance {nearest_distance}", end = "\r")
                 ans_dict[name1] = nearest_distance
                 # absolute_positional_error = np.append(absolute_positional_error, nearest_distance)
@@ -426,7 +440,8 @@ class positionAccuracyAssessor:
                     target_item, 
                     reference_items,
                     index_project,
-                    mode='slice'):
+                    mode='slice',
+                    target_tiles = []):
         ''' 
         本函数计算一个slice内部的所有向量之间的
         此函数输入为本工程定义的类 hd_item1，hd_item2中的data数据为gdal的DataSource对象
@@ -469,7 +484,8 @@ class positionAccuracyAssessor:
                                                                                 _trans_reference_geometry_list, 
                                                                                 min_area=20,
                                                                                 index_project=index_project,
-                                                                                mode=mode) 
+                                                                                mode=mode,
+                                                                                target_tiles=target_tiles) 
 
 
         return absolute_positional_error
@@ -536,8 +552,9 @@ class positionAccuracyAssessor:
         #遍历文件夹内文件，迭代地找到该目录下所有的车端矢量数据
         slice_num = len(target_geojson_path)
         count = 0
+        print("building index...")
         for vec_item in target_geojson_path:
-            print(f'{count} / {slice_num}')
+            print(f'{count} / {slice_num}',end='\r')
             count += 1
             #返回一个列表，存储相关联的瓦片，首先置为空值
             _refered_tiles = []
@@ -553,7 +570,10 @@ class positionAccuracyAssessor:
             else:
                 raise ValueError("Invalid mode specified.")
             #将_current_fc_extent转换为shapely的box类型
-            _single_extent_geometry = box(_current_fc_extent[0], _current_fc_extent[1], _current_fc_extent[2], _current_fc_extent[3])
+            _single_extent_geometry = box(_current_fc_extent[0], 
+                                          _current_fc_extent[1], 
+                                          _current_fc_extent[2], 
+                                          _current_fc_extent[3])
 
             #使用
             _keys_name_list = list(geojson_data.keys())
@@ -751,15 +771,29 @@ class positionAccuracyAssessor:
 if __name__ == 'src.evaluation.validate':
     _file_path = 'config.ini'
     PA_Assessor = positionAccuracyAssessor(_file_path)
-    PA_Assessor.batch_compare(
-        target_path = "./output/"
-        # if_index=True,
-        # target_type ='recons'
-        )
-    
     # PA_Assessor.batch_compare(
-    #     target_path = "./reconstruction_output_0923/",
+    #     # target_path = r".\\output\\"
+    #     target_path = r'.\\reconstruction_output_temp\\'
+    #     # if_index=True,
+    #     # target_type ='recons'
+    #     )
+    # input()
+    # PA_Assessor.batch_compare(
+    #     target_path = r'.\\reconstruction_output_temp\\',
     #     # if_index=True,
     #     target_type ='recons'
     #     )
- 
+
+    PA_Assessor.batch_compare(
+        target_path = '/home/gyx/data/cqc/processed/fit1011',
+        # if_index=True,
+        # target_type ='recons'
+        )
+
+    # PA_Assessor.batch_compare(
+    #     target_path = '/home/gyx/data/cqc/processed/fit0925',
+    #     # if_index=True,
+    #     target_type ='recons'
+    #     )
+    
+    # input()

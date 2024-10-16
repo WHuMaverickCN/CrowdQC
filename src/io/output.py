@@ -4,6 +4,15 @@ import geojson
 import os
 import json
 
+def write_recons_bias_info(target_file_path,
+                    bias_info,
+                    bias_file_name = 'veh2recons_bias.json'):
+    target_dir = os.path.dirname(target_file_path)
+    output_json_path = os.path.join(target_dir, bias_file_name)
+    with open(output_json_path, 'w') as json_file:
+        json.dump(bias_info, json_file, indent=4)
+    
+
 def write_bias_info(target_file_path,
                     bias_info,
                     mode):
@@ -20,7 +29,7 @@ def write_bias_info(target_file_path,
     with open(output_json_path, 'w') as json_file:
         json.dump(bias_info, json_file, indent=4)
 
-    print(f"Dictionary has been written to {output_json_path}")
+    # print(f"Dictionary has been written to {output_json_path}")
 
 def write_reconstructed_result(default_output_path,
                         output_file_name,
@@ -36,7 +45,7 @@ def write_reconstructed_result(default_output_path,
     with open(os.path.join(default_output_path, output_file_name+".geojson"), 'w') as f:
         geojson.dump(feature_collection, f)
     
-    with open(os.path.join(default_output_path, output_file_name+"recons_log.json"), 'w') as f:
+    with open(os.path.join(default_output_path, output_file_name+"_recons_log.json"), 'w') as f:
         geojson.dump(recons_log, f)
     
 def wirte_cluster_to_csv(path):

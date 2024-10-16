@@ -3,13 +3,19 @@ output/
 temp_geo/
 temp_image/
 reconstruction_output*/
+.data/
+runs/
+paddle_project/
 
 .vscode/
 
 # 屏蔽特定名称
 config.ini
-requirements.txt
+# requirements.txt
 
 # 屏蔽生成的图片
 *.jpg
 *.log
+
+#屏蔽生成的模型
+model_*.pth
