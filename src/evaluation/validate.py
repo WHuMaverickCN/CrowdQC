@@ -785,9 +785,15 @@ if __name__ == 'src.evaluation.validate':
     #     )
 
     PA_Assessor.batch_compare(
-        target_path = '/home/gyx/data/cqc/processed/fit0925',
+        target_path = '/home/gyx/data/cqc/processed/fit1011',
         # if_index=True,
-        target_type ='recons'
+        # target_type ='recons'
         )
+
+    # PA_Assessor.batch_compare(
+    #     target_path = '/home/gyx/data/cqc/processed/fit0925',
+    #     # if_index=True,
+    #     target_type ='recons'
+    #     )
     
     # input()

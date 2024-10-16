@@ -65,8 +65,14 @@ class CTransformer(nn.Module):
         super().__init__()
 
         self.num_tokens, self.max_pool = num_tokens, max_pool
-
+        
+        # 下面3行是我自行修改的
+        num_tokens = 100
+        # self.token_embedding = nn.Linear(num_tokens, emb)
         self.token_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=num_tokens)
+        # self.token_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=num_tokens)
+        # 下面3行是我自行修改的
+
         self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length)
 
         tblocks = []
@@ -85,6 +91,7 @@ class CTransformer(nn.Module):
         :param x: A batch by sequence length integer tensor of token indices.
         :return: predicted log-probability vectors for each token based on the preceding tokens.
         """
+        # tokens = self.token_embedding(x)
         tokens = self.token_embedding(x)
         b, t, e = tokens.size()
 

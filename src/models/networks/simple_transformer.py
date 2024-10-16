@@ -86,18 +86,50 @@ import random, tqdm, sys, math, gzip
 from src.models import former
 from src.models.former import util
 from src.models.former.util import d, here
+from src.io.data_load_utils import BiasDataset
 
 # Used for converting between nats and bits
 LOG2E = math.log2(math.e)
 NUM_CLS = 2
 # TEXT = data.Field(lower=True, include_lengths=True, batch_first=True)
 # LABEL = data.Field(sequential=False)
+def collate_batch(batch):
+    text_list, label_list = [], []
+        
+    for _text, _label in batch:
+        # 将特征 tensor 转换为 long 类型
+        text_list.append(_text.long())  # 转换为整型
+        label_list.append(_label.long())  # 标签也转换为整型
+
+    # padding 处理，保证序列长度一致（根据你的需求，也可以不使用）
+    text_list = torch.nn.utils.rnn.pad_sequence(text_list, batch_first=True)
+    label_list = torch.tensor(label_list, dtype=torch.long)
+        
+    return text_list, label_list
+
+def _get_train_dataset():
+    # Define the path to your data directory
+    data_dir = "/home/gyx/data/cqc/processed/fit1011/"
+    # Create the dataset
+    dataset = BiasDataset(data_dir)
+    # Split the dataset into training and testing sets
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True,collate_fn=collate_batch)
+    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False,collate_fn=collate_batch)
+    return train_loader,test_loader
 
 def go(arg):
     '''
     Creates and trains a basic transformer for the IMDB sentiment classification task.
     '''
     tbw = SummaryWriter(log_dir=arg.tb_dir) # Tensorboard logging
+    '''
+    # 这部分代码是用于测试RNN模型的
+    #  
     ### 以下部分section1-6是基于pb代码，在pytorch 2.0.0之后的版本上基于DataLoader重构的
 
     # 1. 定义分词器
@@ -147,13 +179,15 @@ def go(arg):
                             batch_size=batch_size, 
                             shuffle=False, 
                             collate_fn=collate_batch) 
-    
+
     # 6. 打印一个 batch 的内容
     for text_batch, label_batch in train_dataloader:
         print("Text batch shape:", text_batch.shape)
         print("Label batch shape:", label_batch.shape)
         break
+    '''
 
+    train_dataloader,test_dataloader = _get_train_dataset()
     if arg.max_length < 0:
         mx = max([input.text[0].size(1) for input in train_iter])
         mx = mx * 2
@@ -217,11 +251,10 @@ def go(arg):
             tbw.add_scalar('classification/train-loss', float(loss.item()), seen)
 
         with torch.no_grad():
-
             model.train(False)
             tot, cor= 0.0, 0.0
 
-            for batch in tqdm.tqdm(train_dataloader):
+            for batch in tqdm.tqdm(test_dataloader):
 
                 # input = batch.text[0]
                 # label = batch.label - 1
@@ -243,69 +276,69 @@ if __name__ == "src.models.networks.simple_transformer":#作为模块运行
 
     parser = ArgumentParser()
 
-    parser.add_argument("-e", "--num-epochs",
-                        dest="num_epochs",
-                        help="Number of epochs.",
-                        default=80, type=int)
+    # parser.add_argument("-e", "--num-epochs",
+    #                     dest="num_epochs",
+    #                     help="Number of epochs.",
+    #                     default=80, type=int)
 
-    parser.add_argument("-b", "--batch-size",
-                        dest="batch_size",
-                        help="The batch size.",
-                        default=4, type=int)
+    # parser.add_argument("-b", "--batch-size",
+    #                     dest="batch_size",
+    #                     help="The batch size.",
+    #                     default=4, type=int)
 
-    parser.add_argument("-l", "--learn-rate",
-                        dest="lr",
-                        help="Learning rate",
-                        default=0.0001, type=float)
+    # parser.add_argument("-l", "--learn-rate",
+    #                     dest="lr",
+    #                     help="Learning rate",
+    #                     default=0.0001, type=float)
 
-    parser.add_argument("-T", "--tb_dir", dest="tb_dir",
-                        help="Tensorboard logging directory",
-                        default='./runs')
+    # parser.add_argument("-T", "--tb_dir", dest="tb_dir",
+    #                     help="Tensorboard logging directory",
+    #                     default='./runs')
 
-    parser.add_argument("-f", "--final", dest="final",
-                        help="Whether to run on the real test set (if not included, the validation set is used).",
-                        action="store_true")
+    # parser.add_argument("-f", "--final", dest="final",
+    #                     help="Whether to run on the real test set (if not included, the validation set is used).",
+    #                     action="store_true")
 
-    parser.add_argument("--max-pool", dest="max_pool",
-                        help="Use max pooling in the final classification layer.",
-                        action="store_true")
+    # parser.add_argument("--max-pool", dest="max_pool",
+    #                     help="Use max pooling in the final classification layer.",
+    #                     action="store_true")
 
-    parser.add_argument("-E", "--embedding", dest="embedding_size",
-                        help="Size of the character embeddings.",
-                        default=128, type=int)
+    # parser.add_argument("-E", "--embedding", dest="embedding_size",
+    #                     help="Size of the character embeddings.",
+    #                     default=128, type=int)
 
-    parser.add_argument("-V", "--vocab-size", dest="vocab_size",
-                        help="Number of words in the vocabulary.",
-                        default=150_000, type=int)
+    # parser.add_argument("-V", "--vocab-size", dest="vocab_size",
+    #                     help="Number of words in the vocabulary.",
+    #                     default=150_000, type=int)
 
-    parser.add_argument("-M", "--max", dest="max_length",
-                        help="Max sequence length. Longer sequences are clipped (-1 for no limit).",
-                        default=512, type=int)
+    # parser.add_argument("-M", "--max", dest="max_length",
+    #                     help="Max sequence length. Longer sequences are clipped (-1 for no limit).",
+    #                     default=512, type=int)
 
-    parser.add_argument("-H", "--heads", dest="num_heads",
-                        help="Number of attention heads.",
-                        default=8, type=int)
+    # parser.add_argument("-H", "--heads", dest="num_heads",
+    #                     help="Number of attention heads.",
+    #                     default=8, type=int)
 
-    parser.add_argument("-d", "--depth", dest="depth",
-                        help="Depth of the network (nr. of self-attention layers)",
-                        default=6, type=int)
+    # parser.add_argument("-d", "--depth", dest="depth",
+    #                     help="Depth of the network (nr. of self-attention layers)",
+    #                     default=6, type=int)
 
-    parser.add_argument("-r", "--random-seed",
-                        dest="seed",
-                        help="RNG seed. Negative for random",
-                        default=1, type=int)
+    # parser.add_argument("-r", "--random-seed",
+    #                     dest="seed",
+    #                     help="RNG seed. Negative for random",
+    #                     default=1, type=int)
 
-    parser.add_argument("--lr-warmup",
-                        dest="lr_warmup",
-                        help="Learning rate warmup.",
-                        default=10_000, type=int)
+    # parser.add_argument("--lr-warmup",
+    #                     dest="lr_warmup",
+    #                     help="Learning rate warmup.",
+    #                     default=10_000, type=int)
 
     parser.add_argument("--gradient-clipping",
                         dest="gradient_clipping",
                         help="Gradient clipping.",
                         default=1.0, type=float)
 
-    options = parser.parse_args()
+    options = parser.parse_args(args=[])
 
     print('OPTIONS ', options)
 

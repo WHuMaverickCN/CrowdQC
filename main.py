@@ -7,25 +7,32 @@ from src.pose.pipeline import PositionErrorPredictPipeline
 # simple_transformer
 import logging
 
-from experiments.runner import *
+from experiments.runner import Runner
+from experiments.ddp import ddp_init
 from src.io.parse_utils import define_args
 from config import inference
 
 if __name__ == "__main__":
+    # from src.evaluation import validate
     '''
     以下部分是用于推理
     '''
     parser = define_args()
     args = parser.parse_args()
-
+    print('Args Settings', args)
     inference.config(args)
-    runner = Runner(args)
-    
     ddp_init(args)
-    # from src.evaluation import validate
+    runner = Runner(args)
+
+    args.evaluate = False
+    if not args.evaluate:
+        runner.train()
+    else:
+        runner.eval()
     input()
 
     # 配置日志记录器
+
     logging.basicConfig(
         level=logging.INFO,  # 设置日志级别
         format='%(asctime)s - %(message)s',  # 日志格式：时间戳 - 消息内容
@@ -37,7 +44,10 @@ if __name__ == "__main__":
     # 使用示例
     '''
     # 使用1: 直接对图像进行逆透视变换读取参数
-    reconstruction = EgoviewReconstruction(path_to_data='some_path')
+    reconstruction
+     
+      .
+        = EgoviewReconstruction(path_to_data='some_path')
     undistorted_img = reconstruction.get_undistort_img()
     # 批量进行车道线重建
     reconstruction.inverse_perspective_mapping(undistorted_img)
@@ -56,10 +66,11 @@ if __name__ == "__main__":
     file_list = os.listdir(target_path)
     # target_vec_slice = "1690181536394800_1690181541927900_PE.geojson"
 
-    # target_vec_slice = "1690353428424700_1690353430258800_PE.geojson"
+    # ta1rget_vec_slice = "1690353428424700_1690353430258800_PE.geojson"
     # target_vec_slice = "1690353426889700_1690353428890700_PE.geojson"
     # target_vec_slice = "1690353425624699_1690353426890700_PE.geojson"
-    # target_vec_slice = "1690354775327700_1690354780995200_PE.geojson"
+    # t
+    # aret_vec_slice = "1690354775327700_1690354780995200_PE.geojson"
     # pipeline = PositionErrorPredictPipeline(vec_path = target_vec_slice,
     #                                         config_file = "config.ini",
     #                                         id = True,
@@ -76,3 +87,5 @@ if __name__ == "__main__":
                                             id = True,
                                             target_folder = 'output')
             
+
+

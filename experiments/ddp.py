@@ -37,7 +37,7 @@ def setup_slurm(args):
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method('spawn')
 
-    args.proc_id = int(os.environ['SLURM_PROCID'])
+    args.proc_id = int(os.environ[''])
     ntasks = int(os.environ['SLURM_NTASKS'])
     node_list = os.environ['SLURM_NODELIST']
     num_gpus = torch.cuda.device_count()
@@ -58,6 +58,12 @@ def setup_slurm(args):
     os.environ['LOCAL_RANK'] = str(local_rank)
 
 def setup_distributed(args):
+    # node_list = os.environ['SLURM_NODELIST']
+    # addr = subprocess.getoutput(
+    #     f'scontrol show hostname {node_list} | head -n1')
+    # os.environ['MASTER_PORT'] = str(args.port)
+    # os.environ['MASTER_ADDR'] = addr
+
     args.gpu = args.local_rank
     torch.cuda.set_device(args.gpu)
     dist.init_process_group(backend='nccl')
@@ -97,7 +103,6 @@ def reduce_tensor(tensor, world_size):
     dist.all_reduce(rt, op=dist.ReduceOp.SUM)
     rt /= world_size
     return rt
-
 
 def reduce_tensors(*tensors, world_size):
     return [reduce_tensor(tensor, world_size) for tensor in tensors]
