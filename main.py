@@ -7,6 +7,7 @@ from src.pose.pipeline import PositionErrorPredictPipeline
 # simple_transformer
 import logging
 
+# from experiments.runner_dist import Runner
 from experiments.runner import Runner
 from experiments.ddp import ddp_init
 from src.io.parse_utils import define_args
@@ -19,7 +20,10 @@ if __name__ == "__main__":
     '''
     parser = define_args()
     args = parser.parse_args()
+
+
     print('Args Settings', args)
+    # print(args.no_cuda)
     inference.config(args)
     ddp_init(args)
     runner = Runner(args)
@@ -29,7 +33,7 @@ if __name__ == "__main__":
         runner.train()
     else:
         runner.eval()
-    input()
+    input("验证完成")
 
     # 配置日志记录器
 

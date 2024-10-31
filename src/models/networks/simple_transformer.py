@@ -129,7 +129,6 @@ def go(arg):
     tbw = SummaryWriter(log_dir=arg.tb_dir) # Tensorboard logging
     '''
     # 这部分代码是用于测试RNN模型的
-    #  
     ### 以下部分section1-6是基于pb代码，在pytorch 2.0.0之后的版本上基于DataLoader重构的
 
     # 1. 定义分词器

@@ -7,7 +7,8 @@ from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 
-from src.utils import mkdir_if_missing
+from src.utils import mkdir_if_missing,\
+                        print_run_time
 from src.io.data_load_utils import BiasDataset
 
 from src.models import former
@@ -28,7 +29,7 @@ class Runner:
         # Check GPU availability
         os.environ['TORCH_USE_CUDA_DSA'] = '1'
         os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-        os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 只使用GPU 2
+        # os.environ["CUDA_VISIBLE_DEVICES"] = "2"  # 只使用GPU 2
         os.environ['WORLD_SIZE'] = str(args.world_size)
         if not args.no_cuda and not torch.cuda.is_available():
             raise Exception("No gpu available for usage")
@@ -37,18 +38,25 @@ class Runner:
             torch.cuda.empty_cache()
 
         # Get Dataset
+        # if args.proc_id == 0:#单卡处理的情况
+        #     print("Loading Dataset ...")
+        #     self.train_dataloader,\
+        #     self.test_dataloader = self._get_train_dataset()
+
         if args.proc_id == 0:#单卡处理的情况
             print("Loading Dataset ...")
             self.train_dataloader,\
-            self.test_dataloader = self._get_train_dataset()
+            self.val_loader,\
+            self.test_dataloader = self._get_train_val_test_datasets()
+        
         else:#多卡处理的情况
             pass
-        # 创建推理结果路径
-        # train_dataloader,test_dataloader = self._get_train_dataset()
+
 
         mkdir_if_missing(args.save_path)
-        tbw = SummaryWriter(log_dir=args.tb_dir) 
-
+        # if not args.no_tb and args.proc_id == 0:
+        #     self.writer = SummaryWriter(log_dir=args.tb_dir) 
+        self.writer = SummaryWriter(log_dir=args.tb_dir) 
         if args.model_name == 'ClassFormer':
             self.criterion = torch.nn.NLLLoss()
         
@@ -59,10 +67,13 @@ class Runner:
         # from src.models.networks import simple_transformer
         # from src.models.networks import feature_extractor
     
+    @print_run_time('训练模型')
     def train(self):
         args = self.args
         train_dataloader = self.train_dataloader
-        
+        test_dataloader = self.test_dataloader
+        validation_dataloader = self.val_loader
+        tbw = self.writer
         # Define the model
         if args.model_name == 'ClassFormer':
             model, \
@@ -79,8 +90,17 @@ class Runner:
             device = torch.device("cuda", args.local_rank)
             criterion = criterion.to(device)
             model.to(device)
-
+        else:
+            device = torch.device('cpu')
+        # device = torch.device('cpu'
+        if not args.no_tb and args.proc_id == 0:
+            writer = self.writer
+        # Start training and validation for nepochs
+        seen = 0
         for e in range(args.num_epochs):
+            tot, cor= 0.0, 0.0
+            print(f'\n epoch {e}')
+            model.train(True)
             for batch in tqdm.tqdm(train_dataloader):
                 optimizer.zero_grad()
                 input, \
@@ -89,15 +109,71 @@ class Runner:
                     input = input[:, :self.mx]
                 out = model(input)
 
+                _out = model(input).argmax(dim=1)
+                tot += float(input.size()[0])
+                cor += float((label == _out).sum().item())
+
+
                 label = label.long()
                 loss = criterion(out, label)
-                
+
                 loss.backward()
+
+                # clip gradients
+                # - If the total gradient vector has a length > 1, we clip it back down to 1.
+                if args.gradient_clipping > 0.0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.gradient_clipping)
                 
+                optimizer.step()
+                scheduler.step()
 
+                seen += input.size(0)
+                tbw.add_scalar('classification/train-loss', float(loss.item()), seen)
+                if not args.no_tb and args.proc_id == 0:
+                    writer.add_scalar('classification/train-loss', float(loss.item()), seen)
+            acc = cor / tot
+            print(f'-- train accuracy {acc:.3}')
+            with torch.no_grad():
+                model.train(False)
+                tot, cor= 0.0, 0.0
+                for batch in tqdm.tqdm(validation_dataloader):
 
+                    # input = batch.text[0]
+                    # label = batch.label - 1
+                    input, label = batch[0].to(device), (batch[1]).to(device)
 
+                    if input.size(1) > self.mx:
+                        input = input[:, :self.mx]
+                    out = model(input).argmax(dim=1)
+                    # print(f"当前batch的位置精度预测结果{sum(out)} / {sum(batch[1].size())},loss{float(loss)}","\r")
+                    tot += float(input.size(0))
+                    cor += float((label == out).sum().item())
 
+                acc = cor / tot
+                print(f'-- {"test" if args.final else "validation"} accuracy {acc:.3}')
+                tbw.add_scalar('classification/test-loss', float(loss.item()), e)
+                if not args.no_tb and args.proc_id == 0:
+                    writer.add_scalar('classification/test-loss', float(loss.item()), e)
+        # 保存模型参数
+        with torch.no_grad():
+            model.train(False)
+            tot, cor= 0.0, 0.0
+            for batch in tqdm.tqdm(test_dataloader):
+                input, label = batch[0].to(device), (batch[1]).to(device)
+
+                if input.size(1) > self.mx:
+                    input = input[:, :self.mx]
+                out = model(input).argmax(dim=1)
+                # print(f"当前batch的位置精度预测结果{sum(out)} / {sum(batch[1].size())},loss{float(loss)}","\r")
+                tot += float(input.size(0))
+                cor += float((label == out).sum().item())
+
+            acc = cor / tot
+            print(f'--test accuracy {acc:.3}')
+            tbw.add_scalar('classification/test-loss', float(loss.item()), e)
+            if not args.no_tb and args.proc_id == 0:
+                writer.add_scalar('classification/test-loss', float(loss.item()), e)
+        # torch.save(model.state_dict(), 'model_80_split82_1000_fit1011.pth')  
     def validate(self):
         args = self.args
         pass
@@ -105,21 +181,52 @@ class Runner:
     def eval(self):
         args = self.args
         pass
-    
-    def _get_train_dataset(self):
-        # Define the path to your data directory
-        # data_dir = self.data
+    def _get_train_val_test_datasets(self):
+    # Define the path to your data directory
         data_dir = "/home/gyx/data/cqc/processed/fit1011/"
         # Create the dataset
         dataset = BiasDataset(data_dir)
+        
+        # Calculate the sizes of the splits
+        total_size = len(dataset)
+        train_size = int(0.7 * total_size)
+        val_size = int(0.2 * total_size)
+        test_size = total_size - train_size - val_size
+        
+        # Ensure the sum of sizes equals the total dataset size
+        assert train_size + val_size + test_size == total_size, "The sum of train, val, and test sizes must equal the total dataset size."
+        
+        # Split the dataset into training, validation, and testing sets
+        # Set the random seed for reproducibility
+        torch.manual_seed(15)  # You can choose any seed value
+        train_dataset, val_test_dataset = torch.utils.data.random_split(dataset, [train_size, val_size + test_size])
+        val_size_split = int(0.5 * (val_size + test_size))  # Split the remaining data into validation and test sets
+        test_size_split = val_size + test_size - val_size_split
+        val_dataset, test_dataset = torch.utils.data.random_split(val_test_dataset, [val_size_split, test_size_split])
+        
+        # Create DataLoaders
+        batch_size = self.args.batch_size
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=self.collate_batch)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=self.collate_batch)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=self.collate_batch)
+        
+        return train_loader, val_loader, test_loader
+
+    def _get_train_dataset(self):
+        # Define the path to your data directory
+        # data_dir = self.data
+        data_dir = "/home/gyx/data/cqc/processed/fit1011/" 
+        # Create the dataset
+        dataset = BiasDataset(data_dir)
+        batch_size =self.args.batch_size    
         # Split the dataset into training and testing sets
         train_size = int(0.8 * len(dataset))
         test_size = len(dataset) - train_size
         train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
         # Create DataLoaders
-        train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True,collate_fn=self.collate_batch)
-        test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False,collate_fn=self.collate_batch)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,collate_fn=self.collate_batch)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,collate_fn=self.collate_batch)
         return train_loader,test_loader
 
     def _get_test_dataset(self):
@@ -134,7 +241,7 @@ class Runner:
             
         for _text, _label in batch:
             # 将特征 tensor 转换为 long 类型
-            text_list.append(_text.long())  # 转换为整型
+            text_list.append(torch.clamp(_text, max=99).long())  # 转换为整型
             label_list.append(_label.long())  # 标签也转换为整型
 
         # padding 处理，保证序列长度一致（根据你的需求，也可以不使用）
@@ -204,7 +311,8 @@ class Runner:
 
         # dist.barrier()
 
-        if args.distributed:
+        if args.distributed and not args.no_cuda:
+            # 如果没有使用GPU，则不使用分布式训练
             if args.model_name == "ClassFormer":
                 model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True)
         

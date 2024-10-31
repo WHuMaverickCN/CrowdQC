@@ -10,17 +10,20 @@ def config(args):
     args.save_path = './inference/'
     args.world_size = 4 # 优先使用四张卡训练
 
+    # args.no_cuda = False
     # for the case only running evaluation
     args.evaluate = False
     args.evaluate_case = False
     args.evaluate = True
     args.evaluate_case = True
-
+    # 是否使用Tensorboard
+    args.no_tb = True
+    
     # ddp init
     args.use_slurm = False
     # args.local_rank = 0
 
-        # ddp related
+    # ddp related
     args.dist = True
     args.sync_bn = True
 

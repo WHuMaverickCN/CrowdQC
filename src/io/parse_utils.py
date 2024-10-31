@@ -59,7 +59,7 @@ def define_args():
     parser.add_argument("-e", "--num-epochs",
                         dest="num_epochs",
                         help="Number of epochs.",
-                        default=80, type=int)
+                        default=12, type=int)
 
     parser.add_argument("-b", "--batch-size",
                         dest="batch_size",
@@ -117,4 +117,6 @@ def define_args():
                         dest="gradient_clipping",
                         help="Gradient clipping.",
                         default=1.0, type=float)
+    parser.add_argument('--gpu', type=int, default = 0)
+    parser.add_argument('--distributed', action='store_true')
     return parser

@@ -45,7 +45,7 @@ class BiasDataset(Dataset):
                     veh2recons_bias = json.load(f)
 
                 if len(slice_bias) < feature_num:
-                    print(f"Skipping {folder} because slice_bias has fewer than 6 elements.")
+                    # print(f"Skipping {folder} because slice_bias has fewer than 6 elements.")
                     continue
 
                 # Get the first 20 values from veh2recons_bias
@@ -55,10 +55,8 @@ class BiasDataset(Dataset):
                 # Calculate the mean of the first 20 values from slice_bias
                 slice_values = list(slice_bias.values())[:feature_num]
                 mean_slice_value = sum(slice_values) / len(slice_values)
-                label = 1 if mean_slice_value < 1 else 0
+                label = 1 if mean_slice_value < 1.0 else 0
                 self.labels.append(label)
-                
-    
 
     def __len__(self):
         return len(self.data)

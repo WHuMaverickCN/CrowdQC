@@ -189,6 +189,7 @@ def d(tensor=None):
     :param tensor:
     :return:
     """
+    # return 'cpu'
     if tensor is None:
         return 'cuda' if torch.cuda.is_available() else 'cpu'
     return 'cuda' if tensor.is_cuda else 'cpu'
