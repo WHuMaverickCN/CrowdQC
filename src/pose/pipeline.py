@@ -19,10 +19,13 @@ class PositionErrorPredictPipeline():
         self.get_target_traj_path()
 
     def read_config(self,_path):
+        ''''''
         feature_file_path,location_file_path,vision_file_path = input.read_config_file(_path)
         self.feature_file_path = feature_file_path
         self.location_file_path = location_file_path
         self.vision_file_path = vision_file_path
+        self.vision_file_path = "I:\\ca data\\11_解析数据\\07-25_route35\\03_视觉数据"
+        # feature_file_path,location_file_path,vision_file_path = input.read_config_file_for_batch(_path)
 
         # set the combox item of routes
         routes = os.listdir(feature_file_path)

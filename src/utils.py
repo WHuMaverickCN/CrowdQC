@@ -387,7 +387,8 @@ class DataSearcher:
                     for filename in fnmatch.filter(dirs, pattern):
                         matches.append(os.path.join(root, filename))
                 return matches
-        if "vision" not in directory:
+        # if "vision" not in directory:
+        if "视觉" not in directory:
             found_files = find_files(directory,search_pattern)
         else:
             found_files = find_files(directory,search_pattern,mode="dir")
