@@ -52,7 +52,9 @@ class VehiclesData(HdData):
     ''' 
     该部分实际填充的是车端数据，读取车端捕捉的地图要素
     '''
-    def __init__(self,data,time_slice = 'no-time-slice',dataForm = '车端数据'):
+    def __init__(self,data,
+                 time_slice = 'no-time-slice',
+                 dataForm = '车端数据'):
         #此处实现一个类似于重载的逻辑，通过参数类型构造不同的车端数据类型
         if os.path.isfile(data) and type(time_slice) == str:
             self.data = input._m_read_data_to_ogr_datasource(data)
@@ -299,4 +301,29 @@ class HdmapData(HdData):
         self.data = input._m_read_data_to_ogr_datasource(data)
         if crf == 'wgs84' and target_crf == 'utm111':
             self.data = transform_coordinates(self.data, 32648)
+
+class MapLearnData(HdData):
+    ''' 
+    此处存储众包地图学习数据
+    '''
+    def __init__(self,data,
+                 dataForm = '众包地图学习数据',
+                 crf = 'wgs84',
+                 target_crf = 'utm11'):
+        self.data = input._m_read_data_to_ogr_datasource(data)
+        if crf == 'wgs84' and target_crf == 'utm11':
+            self.data = transform_coordinates(self.data, 32648)
+        # 在进行初始时，此处的数据并未经过gcj02转换，因此需要进行转换
         
+class CartographicData(HdData):
+    ''' 
+    此处存储众包地图学习数据
+    '''
+    def __init__(self,data,
+                 dataForm = '众包地图学习数据',
+                 crf = 'wgs84',
+                 target_crf = 'utm11'):
+        self.data = input._m_read_data_to_ogr_datasource(data)
+        if crf == 'wgs84' and target_crf == 'utm11':
+            self.data = transform_coordinates(self.data, 32648)
+    # 在进行初始时，此处的数据并未经过gcj02转换，因此需要进行转换

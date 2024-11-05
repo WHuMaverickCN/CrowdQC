@@ -2,7 +2,6 @@ import os
 import shutil
 import re
 
-
 # 正则表达式匹配UUID
 uuid_pattern = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 created_folders = set()

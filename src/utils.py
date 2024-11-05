@@ -2,13 +2,15 @@ import re
 import os
 import uuid
 import time
+import json
 import math
 import datetime
 from dataclasses import dataclass
 from datetime import datetime,timedelta
 import pandas as pd
 import numpy as np
-from .io import *
+# from .io import *
+from .io import input,output
 
 x_pi = 3.14159265358979324 * 3000.0 / 180.0
 pi = 3.1415926535897932384626  # π
@@ -123,6 +125,143 @@ class CoordProcessor:
         mglng = lng + dlng
         return lng * 2 - mglng, lat * 2 - mglat
     
+    @staticmethod
+    def trans_Zlevel_to_zero(z_json_path):
+        with open(z_json_path, 'r') as geojson_file:
+            geojson_data = json.load(geojson_file)
+        if 'trajectory_'in z_json_path:
+            #原始轨迹的geojson中最外层包了一个车辆id，此判断是取出其中的geojson
+            geojson_data = geojson_data[list(geojson_data.keys())[0]]
+        for feature in geojson_data['features']:
+            # 获取要素的几何信息
+            geometry = feature['geometry']
+
+            # 检查是否包含 'coordinates' 字段
+            if 'coordinates' in geometry:
+                # 获取坐标列表
+                coordinates = geometry['coordinates']
+                # 遍历坐标列表并将高程设置为 0
+                if geometry['type']=="Polygon":
+                    for i in range(len(coordinates[0])):
+                        coordinates[0][i][2] = 0
+                elif geometry['type']=="LineString":
+                    for i in range(len(coordinates)):
+                        coordinates[i][2] = 0
+                elif geometry['type']=="Point":
+                    coordinates[2] = 0
+    
+        # 将修改后的数据保存回 GeoJSON 文件
+        trans_path = z_json_path.replace('_feature','_feature_noH')
+
+        with open(trans_path, 'w') as output_file:
+                json.dump(geojson_data, output_file, indent=2)
+        # _if_slice = -1
+        # if 'noH' in trans_path and 'all_' not in trans_path:
+        #     _if_slice = 1
+        # else:
+        #     _if_slice = 0
+        # print(trans_path)
+        # if _if_slice == 1:
+        #     with open(trans_path, 'w') as output_file:
+        #         json.dump(geojson_data, output_file, indent=2)
+        # elif _if_slice ==0:
+        #     with open(trans_path.replace('.geojson','noH.geojson'), 'w') as output_file:
+        #         json.dump(geojson_data, output_file, indent=2)
+        print("已将语义高程设置为 0 ，并保存到 _noH.geojson 文件中")
+
+    @staticmethod
+    def trans_gcj02towgs84(bias_json_path):
+        with open(bias_json_path, 'r') as geojson_file:
+            geojson_data = json.load(geojson_file)
+
+        for feature in geojson_data['features']:
+                # 获取要素的几何信息
+                geometry = feature['geometry']
+                # 检查是否包含 'coordinates' 字段
+                if geometry != None:
+                    if 'coordinates' in geometry :
+                        # 获取坐标列表
+                        coordinates = geometry['coordinates']
+                        if geometry['type']=="Polygon":
+                        # 遍历坐标列表并将高程设置为 0
+                            for i in range(len(coordinates[0])):
+                                coordinates[0][i][0],coordinates[0][i][1] = gcj02towgs84_point_level(coordinates[0][i][0],coordinates[0][i][1])
+                        elif geometry['type']=="LineString":
+                            for i in range(len(coordinates)):
+                                coordinates[i][0],coordinates[i][1] = gcj02towgs84_point_level(coordinates[i][0],coordinates[i][1])
+                        elif geometry['type']=="Point":
+                            coordinates[0],coordinates[1] = gcj02towgs84_point_level(coordinates[0],coordinates[1])
+        # with open(bias_json_path.replace('.geojson','_trans.geojson').replace('temp','out'), 'w') as output_file:
+        #     json.dump(geojson_data, output_file, indent=2)
+        # print("已将语义高程设置为 0，并保存到 _noH.geojson 文件中")j
+
+        with open(bias_json_path.replace('.geojson','_trans.geojson'), 'w') as output_file:
+            json.dump(geojson_data, output_file, indent=2)
+        print("已转换坐标，并保存到 _trans.geojson 文件中")
+
+class MapLearnCoordProcessor(CoordProcessor):
+    @staticmethod
+    def trans_Zlevel_to_zero(z_json_path):
+        # 面向地图学习数据和矢量数据的转换
+        with open(z_json_path, 'r') as geojson_file:
+            geojson_data = json.load(geojson_file)
+        if 'trajectory_'in z_json_path:
+            #原始轨迹的geojson中最外层包了一个车辆id，此判断是取出其中的geojson
+            geojson_data = geojson_data[list(geojson_data.keys())[0]]
+        for feature in geojson_data['features']:
+            # 获取要素的几何信息
+            geometry = feature['geometry']
+
+            # 检查是否包含 'coordinates' 字段
+            if 'coordinates' in geometry:
+                # 获取坐标列表
+                coordinates = geometry['coordinates']
+                # 遍历坐标列表并将高程设置为 0
+                if geometry['type']=="Polygon":
+                    for i in range(len(coordinates[0])):
+                        coordinates[0][i][2] = 0
+                elif geometry['type']=="LineString":
+                    for i in range(len(coordinates)):
+                        coordinates[i][2] = 0
+                elif geometry['type']=="Point":
+                    coordinates[2] = 0
+    
+        # 将修改后的数据保存回 GeoJSON 文件
+        trans_path = z_json_path.replace('_feature','_feature_noH')
+
+        with open(trans_path, 'w') as output_file:
+                json.dump(geojson_data, output_file, indent=2)
+        print("已将语义高程设置为 0 ，并保存到 _noH.geojson 文件中")
+
+    def trans_gcj02towgs84(self,bias_json_path):
+        # 面向地图学习数据的反偏转
+        with open(bias_json_path, 'r') as geojson_file:
+            geojson_data = json.load(geojson_file)
+
+        for feature in geojson_data['features']:
+            # 获取要素的几何信息
+            geometry = feature['geometry']
+            # 检查是否包含 'coordinates' 字段
+            if geometry != None:
+                if 'coordinates' in geometry :
+                    # 获取坐标列表
+                    coordinates = geometry['coordinates']
+                    if geometry['type']=="Polygon":
+                    # 遍历坐标列表并将高程设置为 0
+                        for i in range(len(coordinates[0])):
+                            coordinates[0][i][0],coordinates[0][i][1] = self.gcj02towgs84_point_level(coordinates[0][i][0],coordinates[0][i][1])
+                    elif geometry['type']=="LineString":
+                        for i in range(len(coordinates)):
+                            coordinates[i][0],coordinates[i][1] = self.gcj02towgs84_point_level(coordinates[i][0],coordinates[i][1])
+                    elif geometry['type']=="Point":
+                        coordinates[0],coordinates[1] = self.gcj02towgs84_point_level(coordinates[0],coordinates[1])
+        # with open(bias_json_path.replace('.geojson','_trans.geojson').replace('temp','out'), 'w') as output_file:
+        #     json.dump(geojson_data, output_file, indent=2)
+        # print("已将语义高程设置为 0，并保存到 _noH.geojson 文件中")
+
+        with open(bias_json_path.replace('.geojson','_trans.geojson'), 'w') as output_file:
+            json.dump(geojson_data, output_file, indent=2)
+        print("已转换坐标，并保存到 _trans.geojson 文件中") 
 class TimeStampProcessor:
     @staticmethod
     def get_extra_suffix_dataframe(_dataframe):
