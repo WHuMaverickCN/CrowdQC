@@ -79,6 +79,8 @@ def write_to_foler(full_vec_path,#  矢量全路径
     loc_data_2_vis_data.to_csv(target_sample_folder+'/loc2vis.csv')
 
     for _key in vis_data_dict.keys():
+        if _key=="cam_1":
+            continue
         _target_root = os.path.join(target_sample_folder, _key)
         if not os.path.exists(_target_root):
             os.makedirs(_target_root)

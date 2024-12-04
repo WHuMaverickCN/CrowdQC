@@ -6,7 +6,8 @@ def config(args):
     args.model_name = 'ClassFormer'
     
     args.data_dir = 'Inference'
-    args.dataset_name = '/home/gyx/data/cqc/processed/fit1011/'
+    # args.dataset_name = '/home/gyx/data/cqc/processed/fit1011/'
+    args.dataset_name = '/home/gyx/data/cqc/processed/clips_class_mode/'
     args.save_path = './inference/'
     args.world_size = 4 # 优先使用四张卡训练
 

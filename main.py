@@ -21,14 +21,13 @@ if __name__ == "__main__":
     parser = define_args()
     args = parser.parse_args()
 
-
     print('Args Settings', args)
     # print(args.no_cuda)
     inference.config(args)
     ddp_init(args)
     runner = Runner(args)
 
-    args.evaluate = False
+    args.evaluate = True
     if not args.evaluate:
         runner.train()
     else:

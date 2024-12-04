@@ -261,7 +261,8 @@ class EgoviewReconstruction:
                             DEFAULT_PROCESSED_DAT_LOC_PATH,
                             traj_correction_dict,
                             output_file_name,
-                            default_output_path = "reconstruction_output_0923/"):
+                            mask_mode = "pkl",#此处默认的分割类型应当是pkl二进制文件类型
+                            default_output_path = "reconstruction_clip1_1109/"):
 
 
         camera_matrix = self.K_cam0
@@ -298,7 +299,8 @@ class EgoviewReconstruction:
             # 从定位数据中获取四元数、世界坐标、欧拉角
             quat,world_coords_from_ins,rph = get_quaternion_and_coordinates(loc_data_df,
                                                                             file,
-                                                                            "pic_0")
+                                                                            "pic_0",
+                                                                            mask_mode)
             
             rot_param = [quat,rph]
             # print("rph:",rph)
@@ -333,7 +335,14 @@ class EgoviewReconstruction:
             # print(world_coords_from_ins)
             world_coords_from_ins=(closest_point.iloc[5],closest_point.iloc[4])
             # print(world_coords_from_ins)
-            sem_seg = read_segmentation_mask_from_pickle(file)
+
+            # 此处是从pickle数据读取分割结果，此处应当替换为图片效率更高
+            if mask_mode == "jpg":
+                sem_seg = read_segmentation_mask_from_image(file)
+            else:
+                sem_seg = read_segmentation_mask_from_pickle(file)
+
+
             instance_edge_points_list = segment_mask_to_utilized_field_mask(sem_seg,
                                                                             fixed_param)
             # ins_seg = semantic_to_instance_segmentation(sem_seg)
@@ -415,8 +424,10 @@ class EgoviewReconstruction:
         world_point = self.pixel_to_world(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
         world_point_new = self.pixel_to_world_new(u, v, camera_matrix, dist_coeffs, R, t, vehicle_height)
         print("世界坐标:", world_point)
-
-    def batch_ego_reconstruction(self,target_dir="output"):
+    @print_run_time("100clips重建")
+    def batch_ego_reconstruction(self,
+                                 target_dir="output",
+                                 mask_mode="pkl"):
         from concurrent.futures import ProcessPoolExecutor,\
         ThreadPoolExecutor 
         """
@@ -430,7 +441,10 @@ class EgoviewReconstruction:
         def process_file(file, target_dir):
             print(file)
             temp_data_root = os.path.join(target_dir, file)
-            temp_mask_path = os.path.join(temp_data_root, "array_mask")
+            if mask_mode=="pkl":
+                temp_mask_path = os.path.join(temp_data_root, "array_mask")
+            elif mask_mode=="jpg":
+                temp_mask_path = os.path.join(temp_data_root, "image_mask")
             temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
             
             temp_traj_file = glob.glob(os.path.join(temp_data_root, "trajectory*"))
@@ -445,7 +459,8 @@ class EgoviewReconstruction:
                 DEFAULT_MASK_FILE_PATH=temp_mask_path,
                 DEFAULT_PROCESSED_DAT_LOC_PATH=temp_loc_file,
                 traj_correction_dict=traj_correction_dict,
-                output_file_name=file
+                output_file_name=file,
+                mask_mode = mask_mode
             )
         files = os.listdir(target_dir)
         with ThreadPoolExecutor() as executor:
@@ -454,29 +469,33 @@ class EgoviewReconstruction:
         # 等待所有任务完成
         for future in futures:
             future.result()
-        '''
-        files = os.listdir(target_dir)
-        for file in files:
-            print(file)
-            temp_data_root = os.path.join(target_dir, file)
-            temp_mask_path = os.path.join(temp_data_root, "array_mask")
-            temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
+        
+        # files = os.listdir(target_dir)
+        # for file in files:
+        #     print(file)
+        #     temp_data_root = os.path.join(target_dir, file)
+        #     if mask_mode=="pkl":
+        #         temp_mask_path = os.path.join(temp_data_root, "array_mask")
+        #     elif mask_mode=="jpg":
+        #         temp_mask_path = os.path.join(temp_data_root, "image_mask")
+        #     temp_loc_file = os.path.join(temp_data_root, "loc2vis.csv")
             
-            temp_traj_file = glob.glob(os.path.join(temp_data_root, "trajectory*"))
-            if len(temp_traj_file) > 0:
-                temp_traj_file = temp_traj_file[0]
-            else:
-                temp_traj_file = ''
+        #     temp_traj_file = glob.glob(os.path.join(temp_data_root, "trajectory*"))
+        #     if len(temp_traj_file) > 0:
+        #         temp_traj_file = temp_traj_file[0]
+        #     else:
+        #         temp_traj_file = ''
 
-            traj_correction_dict = match_trajectory_to_insdata(temp_traj_file,temp_loc_file)
+        #     traj_correction_dict = match_trajectory_to_insdata(temp_traj_file,temp_loc_file)
             
-            self.transation_instance(
-                DEFAULT_MASK_FILE_PATH = temp_mask_path,
-                DEFAULT_PROCESSED_DAT_LOC_PATH = temp_loc_file,
-                traj_correction_dict = traj_correction_dict,
-                output_file_name=file
-            )
-        '''
+        #     self.transation_instance(
+        #         DEFAULT_MASK_FILE_PATH = temp_mask_path,
+        #         DEFAULT_PROCESSED_DAT_LOC_PATH = temp_loc_file,
+        #         traj_correction_dict = traj_correction_dict,
+        #         output_file_name=file,
+        #         mask_mode = mask_mode
+        #     )
+        
     def inverse_perspective_mapping(self, undistorted_img):
         height = int(undistorted_img.shape[0]) # row y
         width = int(undistorted_img.shape[1]) # col x
@@ -587,5 +606,17 @@ def read_segmentation_mask_from_pickle(mask_path):
                                        每个像素值表示类别标签。
     """
     semantic_mask = input.read_mask_data(mask_path)
+    return semantic_mask
+
+def read_segmentation_mask_from_image(mask_path):
+    """
+    从图片文件中读取语义分割的mask图层。
+    参数:
+        mask_path (str): 语义分割的mask文件路径。
+    返回:
+        semantic_mask (numpy.ndarray): 语义分割的结果，大小为 (H, W)，
+                                       每个像素值表示类别标签。
+    """
+    semantic_mask = input.read_mask_data(mask_path,"jpg")
     return semantic_mask
 
