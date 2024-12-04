@@ -1,9 +1,13 @@
 import os
+import cv2
 import json
+import numpy as np
 import configparser
 import geopandas as gpd
 import pandas as pd
 import pickle
+# from PIL import Image
+# from osgeo import ogr
 from osgeo import ogr
 
 def read_semantic_slice_to_ground_truth_dict(_pkl_file_name:str):
@@ -52,11 +56,16 @@ def read_loc_data(path):
     return df
     
 #此类别中需要编写关于读取
-def read_mask_data(path,mask_type="mask"): 
-    with open(path, 'rb') as f:
-    # 使用pickle.load加载数据
-        loaded_data = pickle.load(f)
-    return loaded_data
+
+def read_mask_data(path,mask_type="pkl"): 
+    if mask_type == "pkl":
+        with open(path, 'rb') as f:
+        # 使用pickle.load加载数据
+            loaded_data = pickle.load(f)
+        return loaded_data
+    elif mask_type=="jpg":
+        image_array = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        return image_array
 
 def read_vec_data(path):
     with open(path,"r") as fp:

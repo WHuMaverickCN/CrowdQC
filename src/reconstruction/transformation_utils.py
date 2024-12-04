@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation as sciR
 np.set_printoptions(precision=6, suppress=True)
 from math import pi, \
                 radians, cos, sin, asin, sqrt
-
+from ..utils import print_run_time
 from ..io import input
 
 _lon = 106.4417403
@@ -308,7 +308,7 @@ def trans_instance_to_shape():
 
 # from_wgs84_to_target_proj(_lat,_lon)
 # trans_ego_to_world_coord((0,0,0))
-
+@print_run_time("match_trajectory_to_insdata")
 def match_trajectory_to_insdata(trajectory:str,
                                 ins_data_file:pd.DataFrame):
     print(trajectory)
@@ -322,6 +322,13 @@ def match_trajectory_to_insdata(trajectory:str,
     
     # 解析 B 数据中的点
     B_data = []
+
+    # 如果traj.geojson文件中包含车辆编号，则取内层的数据进行重建
+    if "features" not in _traj.keys():
+        if len(_traj.keys())==1:
+            for _ikey in  _traj.keys():
+                _traj = _traj[_ikey]
+
     for feature in _traj["features"]:
         if feature["geometry"]["type"] == "Point":
             B_data.append(feature["geometry"]["coordinates"][:2])

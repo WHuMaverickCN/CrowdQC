@@ -16,7 +16,6 @@ from src.models.former import util
 from src.models.former.util import d, here
 from src.io.data_load_utils import BiasDataset
 
-
 # Used for converting between nats and bits
 LOG2E = math.log2(math.e)
 NUM_CLS = 2
@@ -51,7 +50,6 @@ class Runner:
         
         else:#多卡处理的情况
             pass
-
 
         mkdir_if_missing(args.save_path)
         # if not args.no_tb and args.proc_id == 0:
@@ -183,7 +181,7 @@ class Runner:
         pass
     def _get_train_val_test_datasets(self):
     # Define the path to your data directory
-        data_dir = "/home/gyx/data/cqc/processed/fit1011/"
+        data_dir = self.args.dataset_name
         # Create the dataset
         dataset = BiasDataset(data_dir)
         

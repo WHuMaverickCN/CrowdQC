@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from shapely.geometry import Polygon
 from .transformation_utils import pixel_to_world_coords
+from ..utils import print_run_time
 
 def extract_edges_from_mask(mask):
     """
@@ -155,6 +156,7 @@ def simplify_polygon(points, epsilon=0.01):
     # simplified_points = np.array([(point[0][0], point[0][1]) for point in simplified_contour], dtype=np.float64)
    
     return simplified_points
+# @print_run_time("segment_mask_to_utilized_field_mask")
 def segment_mask_to_utilized_field_mask(semantic_mask, fixed_param):
     """
     将实例分割的mask图层转化为利用过的区域掩码
@@ -384,11 +386,17 @@ def draw_colored_instances(mask, thickness=3):
         cv2.drawContours(colored_mask, contours, -1, colors[i], thickness)
 
     return colored_mask
-    
-def get_quaternion_and_coordinates(df, pic_value, comparison_field="pic_0"):
+# @print_run_time('单帧重建')
+def get_quaternion_and_coordinates(df, 
+                                   pic_value, 
+                                   comparison_field="pic_0",
+                                   mask_mode="pkl"):
     # 读取CSV文件
     # 筛选与 pic_value 相同的行
-    file_name = os.path.basename(pic_value).replace("_seg_mask.pkl", ".jpg")
+    if mask_mode=="pkl":
+        file_name = os.path.basename(pic_value).replace("_seg_mask.pkl", ".jpg")
+    elif mask_mode=="jpg":
+        file_name = os.path.basename(pic_value).replace("_seg_mask.jpg", ".jpg")
     matched_rows = df[df[comparison_field] == file_name]
 
     if not matched_rows.empty:

@@ -3,6 +3,7 @@ output/
 temp_geo/
 temp_image/
 reconstruction_output*/
+reconstruction_clip*/
 .data/
 runs/
 paddle_project/
